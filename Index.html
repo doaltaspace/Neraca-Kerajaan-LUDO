@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Keuangan Kerajaan: Saldo Tipis Tapi Optimis</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="p-4 md:p-8">
+
+    <!-- Chosen Palette: Comic Book Pop (Yellow bg, strong blacks, bright red/blue/green/purple accents) -->
+    <!-- Application Structure Plan: Restructured the Dashboard based on UI/UX best practices for information flow. Top section is the 'Monitoring Tier' containing the global chart and high-level KPIs (progress, balances). Bottom section is the 'Execution Tier' containing three equal-height columns for Income, Savings, and Expense inputs. This separates monitoring from data entry, reducing cognitive load and visual clutter. -->
+    <!-- Visualization & Content Choices: 1. Top Radar Chart -> Moved to a prominent top-left position to serve as the immediate global context. 2. KPI Cards -> Grouped next to the chart to provide instant numeric status. 3. Input Panels -> Aligned horizontally at the bottom to create a standardized data entry workflow. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+
+    <header class="max-w-7xl mx-auto text-center mb-8 mt-4">
+        <div class="text-7xl mb-4 animate-bounce">👑💰📉</div>
+        <h1 class="text-5xl md:text-7xl font-black text-amber-500 title-shadow mb-4 tracking-wide border-black uppercase">Neraca Kerajaan</h1>
+        <h2 class="text-2xl md:text-3xl font-bold bg-white inline-block px-4 py-2 border-4 border-black rounded-xl shadow-[4px_4px_0px_0px_#000000] rotate-2"> "Saldo Tipis Tapi Optimis!"</h2>
+        
+        <div class="flex justify-center gap-4 mt-8">
+            <button id="tabDashboard" class="comic-btn comic-btn-yellow nav-tab active px-6 py-3 text-xl" onclick="switchView('dashboard')">🗺️ Dasbor Tempur</button>
+            <button id="tabLedger" class="comic-btn comic-btn-blue nav-tab px-6 py-3 text-xl" onclick="switchView('ledger')">📜 Buku Besar</button>
+        </div>
+    </header>
+
+    <!-- DASHBOARD VIEW -->
+    <main id="viewDashboard" class="max-w-7xl mx-auto flex flex-col gap-8">
+        
+        <!-- INFO CARDS TIER -->
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+            <!-- Total Tabungan -->
+            <div class="comic-info-card rounded-[16px] border-[4px] border-black bg-[#7fffb0] shadow-[4px_4px_0px_#000] px-6 py-4 flex flex-col items-center justify-center -rotate-2 cursor-pointer">
+                <span class="font-black text-lg md:text-xl uppercase tracking-wide text-black mb-1" style="letter-spacing:1px;">Total Tabungan</span>
+                <span id="totalTabunganUI" class="font-black text-3xl md:text-4xl text-black">Rp 0</span>
+            </div>
+            <!-- Total Pengeluaran -->
+            <div class="comic-info-card rounded-[16px] border-[4px] border-black bg-[#ffb3b3] shadow-[4px_4px_0px_#000] px-6 py-4 flex flex-col items-center justify-center rotate-1 cursor-pointer">
+                <span class="font-black text-lg md:text-xl uppercase tracking-wide text-black mb-1" style="letter-spacing:1px;">Total Pengeluaran</span>
+                <span id="totalPengeluaranUI" class="font-black text-3xl md:text-4xl text-black">Rp 0</span>
+            </div>
+            <!-- Sisa Operasional -->
+            <div class="comic-info-card rounded-[16px] border-[4px] border-black bg-[#a7e0ff] shadow-[4px_4px_0px_#000] px-6 py-4 flex flex-col items-center justify-center -rotate-1 cursor-pointer">
+                <span class="font-black text-lg md:text-xl uppercase tracking-wide text-black mb-1" style="letter-spacing:1px;">Sisa Operasional (50%)</span>
+                <span id="sisaOperasionalUI" class="font-black text-3xl md:text-4xl text-black">Rp 0</span>
+            </div>
+        </div>
+
+        <!-- TOP TIER: MONITORING -->
+        <div class="grid grid-cols-1 gap-8">
+            <section class="comic-panel p-6 lg:p-8 flex flex-col items-stretch justify-start bg-[#d5dde8] border-4 border-blue-900 relative min-h-[520px]">
+                <h2 class="text-2xl md:text-4xl font-black uppercase tracking-wider flex items-center border-b-4 border-black pb-3 w-full justify-center text-slate-900"><span class="text-3xl mr-3">⚖️</span> Radar Kekayaan Global</h2>
+
+                <!-- Navigation Arrows -->
+                <button onclick="changeSlide(-1)" class="absolute left-2 md:left-6 top-1/2 mt-4 bg-white border-4 border-black rounded-full w-10 h-10 md:w-14 md:h-14 flex items-center justify-center text-xl md:text-3xl font-black shadow-[4px_4px_0px_0px_#000000] hover:-translate-y-[2px] hover:bg-blue-200 hover:shadow-[6px_6px_0px_0px_#000000] active:translate-y-[2px] active:shadow-[2px_2px_0px_0px_#000000] z-10 transition-all cursor-pointer">&lt;</button>
+                <button onclick="changeSlide(1)" class="absolute right-2 md:right-6 top-1/2 mt-4 bg-white border-4 border-black rounded-full w-10 h-10 md:w-14 md:h-14 flex items-center justify-center text-xl md:text-3xl font-black shadow-[4px_4px_0px_0px_#000000] hover:-translate-y-[2px] hover:bg-blue-200 hover:shadow-[6px_6px_0px_0px_#000000] active:translate-y-[2px] active:shadow-[2px_2px_0px_0px_#000000] z-10 transition-all cursor-pointer">&gt;</button>
+
+                <!-- Slide 1: Neraca -->
+                <div id="slideNeraca" class="chart-container w-full mt-4 flex justify-center items-center" style="padding-left:3.5rem;">
+                    <canvas id="neracaChart" style="width:100%!important;height:100%!important;"></canvas>
+                </div>
+
+                <!-- Slide 2: Progress Misi Tabungan -->
+                <div id="slideTarget" class="slide-target-wrap w-full mt-4 hidden">
+                    <div id="missionBarsStage" class="mission-bars-stage">
+                        <div id="missionBarsList" class="mission-bars-list"></div>
+                        <p id="missionBarsEmpty" class="mission-bars-empty hidden">Belum ada misi tabungan. Tambah misi dari PETI HARTA KERAJAAN untuk melihat progress.</p>
+
+                        <div id="missionDetailCard" class="mission-detail-card hidden">
+                            <p id="missionDetailTitle" class="mission-detail-title">MISI AKTIF</p>
+                            <p id="missionDetailMeta" class="mission-detail-meta">0% dari target kerajaan</p>
+                            <p id="missionDetailAmount" class="mission-detail-amount">Rp 0</p>
+                            <p id="missionDetailMessage" class="mission-detail-message">Klik salah satu bar untuk melihat detail misi.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <button id="openStatusMisiBtn" class="radar-settings-btn" aria-label="Buka Status Misi">⚙</button>
+            </section>
+        </div>
+
+        <!-- BOTTOM TIER: EXECUTION & DATA ENTRY -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-stretch pt-2">
+            <!-- Card Tabungan -->
+            <section class="comic-panel p-6 md:p-8 bg-white border-green-500 border-4 flex flex-col shadow-[8px_8px_0px_0px_#22c55e]">
+                <h2 class="text-2xl md:text-3xl font-black uppercase tracking-wider flex items-center border-b-4 border-green-500 pb-4 text-green-700"><span class="text-4xl mr-3">💰</span> PETI HARTA KERAJAAN</h2>
+                <p class="font-bold text-green-700 mt-4 text-base md:text-lg">Timbun pundi-pundi emas untuk masa depan kerajaan! Sedikit-sedikit jadi bukit emas. 🏰</p>
+                <div class="flex flex-col gap-4 mt-6">
+                    <input type="text" id="namaTabungan" placeholder="Nimbun untuk apa? 👑" class="p-3 comic-input font-bold text-lg">
+                    <input type="number" id="jumlahTabungan" placeholder="Berapa keping emas? 💰" class="p-3 comic-input font-bold text-lg">
+                    <select id="kategoriTabungan" class="p-3 comic-input font-bold appearance-none bg-white text-lg">
+                        <option value="Emas Batangan">Emas Batangan</option>
+                        <option value="Rekening Rahasia">Rekening Rahasia</option>
+                        <option value="Saham/Investasi">Saham/Investasi</option>
+                    </select>
+                    <button onclick="catatTransaksi('saving')" class="comic-btn comic-btn-green py-3 px-8 text-xl whitespace-nowrap mt-2">TIMBUN HARTA!</button>
+                </div>
+            </section>
+            <!-- Card Pengeluaran -->
+            <section class="comic-panel p-6 md:p-8 bg-white border-red-500 border-4 flex flex-col shadow-[8px_8px_0px_0px_#ef4444]">
+                <h2 class="text-2xl md:text-3xl font-black uppercase tracking-wider flex items-center border-b-4 border-red-500 pb-4 text-red-600"><span class="text-4xl mr-3">🔥</span> GULUNGAN DOSA KERAJAAN</h2>
+                <p class="font-bold text-red-600 mt-4 text-base md:text-lg">Catat dosa finansial kalian dari Kantong Hidup (50%). Jangan bohong pada catatan! 😈</p>
+                <div class="flex flex-col gap-4 mt-6">
+                    <input type="text" id="namaPengeluaran" placeholder="Beli apa hari ini? 🍔" class="p-3 comic-input font-bold text-lg">
+                    <input type="number" id="jumlahPengeluaran" placeholder="Habis berapa? 💸" class="p-3 comic-input font-bold text-lg">
+                    <select id="kategoriPengeluaran" class="p-3 comic-input font-bold appearance-none bg-white text-lg">
+                        <option value="Ransum (Pangan)">Ransum (Pangan)</option>
+                        <option value="Pajak/Tagihan">Pajak/Tagihan</option>
+                        <option value="Foya-foya (Hiburan)">Foya-foya (Hiburan)</option>
+                        <option value="Obat/Darurat">Obat/Darurat</option>
+                    </select>
+                    <button onclick="catatTransaksi('expense')" class="comic-btn bg-[#ef4444] py-3 px-8 text-xl whitespace-nowrap mt-2">CATAT DOSA!</button>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <div id="statusMisiModal" class="status-modal hidden" aria-hidden="true">
+        <div id="statusMisiBackdrop" class="status-modal-backdrop"></div>
+        <section class="status-modal-content">
+            <div class="flex items-center justify-between border-b-4 border-black pb-2 mb-5">
+                <h3 class="text-xl md:text-2xl font-black uppercase tracking-wide flex items-center gap-2 text-amber-900"><span class="text-2xl">🎯</span>Status Misi</h3>
+                <button id="closeStatusMisiBtn" class="status-close-btn" aria-label="Tutup Status Misi">✕</button>
+            </div>
+
+            <div class="flex flex-col gap-4">
+                <div>
+                    <label class="block text-sm font-bold mb-1 uppercase text-amber-800">Target Tabungan</label>
+                    <input type="number" id="inputTargetTabungan" class="w-full p-3 comic-input text-xl font-bold text-green-700 bg-white" value="3000000" oninput="updateKalkulasi()">
+                </div>
+
+                <div>
+                    <div class="progress-bar-container">
+                        <div id="tabunganProgress" class="progress-bar-fill"></div>
+                    </div>
+                    <p class="text-right font-black mt-2 text-sm"><span id="persenTabungan">0</span>% TERCAPAI DARI TARGET</p>
+                </div>
+
+                <div class="status-mini-grid">
+                    <div class="status-mini-card">
+                        <span class="status-mini-label">Tabungan Terkumpul</span>
+                        <span id="statusTotalTabungan" class="status-mini-value">Rp 0</span>
+                    </div>
+                    <div class="status-mini-card">
+                        <span class="status-mini-label">Sisa Menuju Target</span>
+                        <span id="statusSisaTarget" class="status-mini-value">Rp 0</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- LEDGER VIEW (BUKU BESAR) -->
+    <main id="viewLedger" class="max-w-7xl mx-auto hidden">
+        <section class="comic-panel p-8 bg-gray-50 border-4 border-black">
+            <div class="flex flex-col md:flex-row justify-between items-center mb-6 border-b-4 border-black pb-4">
+                <h2 class="text-4xl font-black uppercase tracking-wider flex items-center"><span class="text-5xl mr-4">📜</span> Gulungan Buku Besar</h2>
+                <div class="flex gap-2 mt-4 md:mt-0">
+                    <!-- <span class="px-3 py-1 bg-blue-200 border-2 border-black font-bold rounded text-sm shadow-[2px_2px_0px_0px_#000]">Pemasukan</span> -->
+                    <span class="px-3 py-1 bg-green-200 border-2 border-black font-bold rounded text-sm shadow-[2px_2px_0px_0px_#000]">Tabungan</span>
+                    <span class="px-3 py-1 bg-red-200 border-2 border-black font-bold rounded text-sm shadow-[2px_2px_0px_0px_#000]">Pengeluaran</span>
+                </div>
+            </div>
+
+            <p class="mb-6 text-lg font-bold text-gray-700">Pusat pencatatan seluruh mutasi harta kerajaan tanpa terkecuali.</p>
+
+            <div class="border-4 border-black rounded-xl overflow-hidden shadow-[8px_8px_0px_0px_#000000] bg-white">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse min-w-[600px]">
+                        <thead>
+                            <tr class="bg-amber-300 text-black uppercase text-xl border-b-4 border-black">
+                                <th class="p-4 border-r-4 border-black">Waktu Titah</th>
+                                <th class="p-4 border-r-4 border-black">Jenis & Kategori</th>
+                                <th class="p-4 border-r-4 border-black">Keterangan</th>
+                                <th class="p-4 text-right">Nilai Mutasi</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabelBukuBesar" class="text-lg font-bold">
+                            <!-- Rows go here -->
+                        </tbody>
+                    </table>
+                </div>
+                <div id="emptyLedgerMessage" class="p-8 text-center font-black text-gray-400 text-2xl uppercase">
+                    Gulungan Masih Kosong. Belum Ada Titah.
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script src="script.js"></script>
+</body>
+</html>
