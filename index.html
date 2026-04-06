@@ -1,194 +1,553 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="id" data-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistem Keuangan Kerajaan: Saldo Tipis Tapi Optimis</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>Neraca Kerajaan LUDO - Dashboard Keuangan</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg viewBox='0 0 32 32' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M4 24h24v3H4z' fill='%23f6a723' rx='1.5'/%3E%3Cpath d='M4 24L2 10l8 6 6-10 6 10 8-6-2 14z' fill='%23f6a723' opacity='0.85'/%3E%3Ccircle cx='8' cy='10.5' r='1.8' fill='%23f6a723'/%3E%3Ccircle cx='16' cy='5.5' r='1.8' fill='%23f6a723'/%3E%3Ccircle cx='24' cy='10.5' r='1.8' fill='%23f6a723'/%3E%3C/svg%3E">
+    <meta name="description" content="Sistem pencatatan keuangan kerajaan yang lucu dan interaktif. Catat pemasukan, pengeluaran, dan tabungan dengan mudah.">
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
-<body class="p-4 md:p-8">
+<body>
 
-    <!-- Chosen Palette: Comic Book Pop (Yellow bg, strong blacks, bright red/blue/green/purple accents) -->
-    <!-- Application Structure Plan: Restructured the Dashboard based on UI/UX best practices for information flow. Top section is the 'Monitoring Tier' containing the global chart and high-level KPIs (progress, balances). Bottom section is the 'Execution Tier' containing three equal-height columns for Income, Savings, and Expense inputs. This separates monitoring from data entry, reducing cognitive load and visual clutter. -->
-    <!-- Visualization & Content Choices: 1. Top Radar Chart -> Moved to a prominent top-left position to serve as the immediate global context. 2. KPI Cards -> Grouped next to the chart to provide instant numeric status. 3. Input Panels -> Aligned horizontally at the bottom to create a standardized data entry workflow. -->
-    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
-
-    <header class="max-w-7xl mx-auto text-center mb-8 mt-4">
-        <div class="text-7xl mb-4 animate-bounce">👑💰📉</div>
-        <h1 class="text-5xl md:text-7xl font-black text-amber-500 title-shadow mb-4 tracking-wide border-black uppercase">Neraca Kerajaan</h1>
-        <h2 class="text-2xl md:text-3xl font-bold bg-white inline-block px-4 py-2 border-4 border-black rounded-xl shadow-[4px_4px_0px_0px_#000000] rotate-2"> "Saldo Tipis Tapi Optimis!"</h2>
-        
-        <div class="flex justify-center gap-4 mt-8">
-            <button id="tabDashboard" class="comic-btn comic-btn-yellow nav-tab active px-6 py-3 text-xl" onclick="switchView('dashboard')">🗺️ Dasbor Tempur</button>
-            <button id="tabLedger" class="comic-btn comic-btn-blue nav-tab px-6 py-3 text-xl" onclick="switchView('ledger')">📜 Buku Besar</button>
+    <!-- ========== LOADING SCREEN ========== -->
+    <div id="loadingScreen" class="full-screen-overlay">
+        <div class="loading-content">
+            <svg class="crown-loading icon-pulse" viewBox="0 0 32 32" fill="none">
+                <path d="M4 24h24v3H4z" fill="currentColor" rx="1.5"/>
+                <path d="M4 24L2 10l8 6 6-10 6 10 8-6-2 14z" fill="currentColor" opacity="0.85"/>
+                <circle cx="8" cy="10.5" r="1.8" fill="currentColor"/>
+                <circle cx="16" cy="5.5" r="1.8" fill="currentColor"/>
+                <circle cx="24" cy="10.5" r="1.8" fill="currentColor"/>
+            </svg>
+            <h2 class="bounce-text" id="loadingText">Menyiapkan Kerajaan...</h2>
         </div>
-    </header>
+    </div>
 
-    <!-- DASHBOARD VIEW -->
-    <main id="viewDashboard" class="max-w-7xl mx-auto flex flex-col gap-8">
-        
-        <!-- INFO CARDS TIER -->
-        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-            <!-- Total Tabungan -->
-            <div class="comic-info-card rounded-[16px] border-[4px] border-black bg-[#7fffb0] shadow-[4px_4px_0px_#000] px-6 py-4 flex flex-col items-center justify-center -rotate-2 cursor-pointer">
-                <span class="font-black text-lg md:text-xl uppercase tracking-wide text-black mb-1" style="letter-spacing:1px;">Total Tabungan</span>
-                <span id="totalTabunganUI" class="font-black text-3xl md:text-4xl text-black">Rp 0</span>
+    <!-- ========== LOGIN SCREEN ========== -->
+    <div id="loginScreen" class="full-screen-overlay" style="display: none;">
+        <div class="login-card">
+            <div class="login-header">
+                <svg id="loginMascot" class="crown-icon mascot" viewBox="0 0 32 32" fill="none" style="transition: transform 0.3s ease;">
+                    <path class="crown-body" d="M4 24h24v3H4z" fill="currentColor" rx="1.5"/>
+                    <path class="crown-body" d="M4 24L2 10l8 6 6-10 6 10 8-6-2 14z" fill="currentColor" opacity="0.85"/>
+                    <circle cx="8" cy="10.5" r="1.8" fill="currentColor"/>
+                    <circle cx="16" cy="5.5" r="1.8" fill="currentColor"/>
+                    <circle cx="24" cy="10.5" r="1.8" fill="currentColor"/>
+                    
+                    <!-- Open Eyes -->
+                    <g id="mascotEyesOpen">
+                        <ellipse cx="12" cy="17" rx="2.5" ry="3.5" fill="#fff" />
+                        <ellipse cx="20" cy="17" rx="2.5" ry="3.5" fill="#fff" />
+                        <circle id="mascotPupilL" cx="12" cy="17" r="1.2" fill="#1a1a2e" style="transition: all 0.1s ease;"/>
+                        <circle id="mascotPupilR" cx="20" cy="17" r="1.2" fill="#1a1a2e" style="transition: all 0.1s ease;"/>
+                    </g>
+                    
+                    <!-- Closed Eyes (Hidden initially) -->
+                    <g id="mascotEyesClosed" style="display: none;">
+                        <path d="M10 17 Q12 15 14 17" stroke="#3d2f12" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+                        <path d="M18 17 Q20 15 22 17" stroke="#3d2f12" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+                        <path d="M12 18 Q16 21 20 18" stroke="#3d2f12" stroke-width="1.5" stroke-linecap="round" fill="none"/> <!-- Blush/Mouth -->
+                    </g>
+                </svg>
+                <h2>Gerbang Utama</h2>
+                <p>Silakan masuk ke Neraca Kerajaan LUDO</p>
             </div>
-            <!-- Total Pengeluaran -->
-            <div class="comic-info-card rounded-[16px] border-[4px] border-black bg-[#ffb3b3] shadow-[4px_4px_0px_#000] px-6 py-4 flex flex-col items-center justify-center rotate-1 cursor-pointer">
-                <span class="font-black text-lg md:text-xl uppercase tracking-wide text-black mb-1" style="letter-spacing:1px;">Total Pengeluaran</span>
-                <span id="totalPengeluaranUI" class="font-black text-3xl md:text-4xl text-black">Rp 0</span>
-            </div>
-            <!-- Sisa Operasional -->
-            <div class="comic-info-card rounded-[16px] border-[4px] border-black bg-[#a7e0ff] shadow-[4px_4px_0px_#000] px-6 py-4 flex flex-col items-center justify-center -rotate-1 cursor-pointer">
-                <span class="font-black text-lg md:text-xl uppercase tracking-wide text-black mb-1" style="letter-spacing:1px;">Sisa Operasional (50%)</span>
-                <span id="sisaOperasionalUI" class="font-black text-3xl md:text-4xl text-black">Rp 0</span>
-            </div>
-        </div>
-
-        <!-- TOP TIER: MONITORING -->
-        <div class="grid grid-cols-1 gap-8">
-            <section class="comic-panel p-6 lg:p-8 flex flex-col items-stretch justify-start bg-[#d5dde8] border-4 border-blue-900 relative min-h-[520px]">
-                <h2 class="text-2xl md:text-4xl font-black uppercase tracking-wider flex items-center border-b-4 border-black pb-3 w-full justify-center text-slate-900"><span class="text-3xl mr-3">⚖️</span> Radar Kekayaan Global</h2>
-
-                <!-- Navigation Arrows -->
-                <button onclick="changeSlide(-1)" class="absolute left-2 md:left-6 top-1/2 mt-4 bg-white border-4 border-black rounded-full w-10 h-10 md:w-14 md:h-14 flex items-center justify-center text-xl md:text-3xl font-black shadow-[4px_4px_0px_0px_#000000] hover:-translate-y-[2px] hover:bg-blue-200 hover:shadow-[6px_6px_0px_0px_#000000] active:translate-y-[2px] active:shadow-[2px_2px_0px_0px_#000000] z-10 transition-all cursor-pointer">&lt;</button>
-                <button onclick="changeSlide(1)" class="absolute right-2 md:right-6 top-1/2 mt-4 bg-white border-4 border-black rounded-full w-10 h-10 md:w-14 md:h-14 flex items-center justify-center text-xl md:text-3xl font-black shadow-[4px_4px_0px_0px_#000000] hover:-translate-y-[2px] hover:bg-blue-200 hover:shadow-[6px_6px_0px_0px_#000000] active:translate-y-[2px] active:shadow-[2px_2px_0px_0px_#000000] z-10 transition-all cursor-pointer">&gt;</button>
-
-                <!-- Slide 1: Neraca -->
-                <div id="slideNeraca" class="chart-container w-full mt-4 flex justify-center items-center" style="padding-left:3.5rem;">
-                    <canvas id="neracaChart" style="width:100%!important;height:100%!important;"></canvas>
+            
+            <form id="loginForm" onsubmit="handleLogin(event)">
+                <div class="form-group">
+                    <label class="form-label" for="loginUsername">Username / Gelar</label>
+                    <input type="text" class="form-input" id="loginUsername" placeholder="Contoh: bos ganteng" required>
                 </div>
+                <div class="form-group">
+                    <label class="form-label" for="loginPassword">Kata Sandi Rahasia</label>
+                    <input type="password" class="form-input" id="loginPassword" placeholder="***" required>
+                </div>
+                <div class="form-group login-options">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="loginRememberMe">
+                        <span class="checkbox-custom"></span>
+                        Ingat Saya (Otologin)
+                    </label>
+                </div>
+                <button type="submit" class="btn btn-amber mt-sm" style="width: 100%;">
+                    Masuk Gerbang
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+                </button>
+            </form>
+        </div>
+    </div>
 
-                <!-- Slide 2: Progress Misi Tabungan -->
-                <div id="slideTarget" class="slide-target-wrap w-full mt-4 hidden">
-                    <div id="missionBarsStage" class="mission-bars-stage">
-                        <div id="missionBarsList" class="mission-bars-list"></div>
-                        <p id="missionBarsEmpty" class="mission-bars-empty hidden">Belum ada misi tabungan. Tambah misi dari PETI HARTA KERAJAAN untuk melihat progress.</p>
+    <!-- ========== MAIN APP (HIDDEN INITALLY) ========== -->
+    <div id="appContainer" style="display: none;">
 
-                        <div id="missionDetailCard" class="mission-detail-card hidden">
-                            <p id="missionDetailTitle" class="mission-detail-title">MISI AKTIF</p>
-                            <p id="missionDetailMeta" class="mission-detail-meta">0% dari target kerajaan</p>
-                            <p id="missionDetailAmount" class="mission-detail-amount">Rp 0</p>
-                            <p id="missionDetailMessage" class="mission-detail-message">Klik salah satu bar untuk melihat detail misi.</p>
+    <!-- ========== NAVBAR ========== -->
+    <nav class="navbar" id="navbar">
+        <div class="navbar-inner">
+            <div class="navbar-left">
+                <a href="#" class="logo">
+                    <!-- Crown SVG -->
+                    <svg class="crown-icon" viewBox="0 0 32 32" fill="none">
+                        <path d="M4 24h24v3H4z" fill="currentColor" rx="1.5"/>
+                        <path d="M4 24L2 10l8 6 6-10 6 10 8-6-2 14z" fill="currentColor" opacity="0.85"/>
+                        <circle cx="8" cy="10.5" r="1.8" fill="currentColor"/>
+                        <circle cx="16" cy="5.5" r="1.8" fill="currentColor"/>
+                        <circle cx="24" cy="10.5" r="1.8" fill="currentColor"/>
+                    </svg>
+                    <span>Neraca Kerajaan</span>
+                </a>
+
+                <div class="nav-links" id="navLinks">
+                    <a href="#" class="nav-link active" data-page="dashboard">Dashboard</a>
+                    <a href="#" class="nav-link disabled" data-page="ledger">Buku Besar</a>
+                    <a href="#" class="nav-link disabled" data-page="goals">Tujuan</a>
+                </div>
+            </div>
+
+            <div class="navbar-right">
+                <!-- Dark Mode Toggle -->
+                <button class="theme-toggle" id="themeToggle" aria-label="Toggle tema gelap">
+                    <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"/>
+                        <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+                    </svg>
+                    <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                    </svg>
+                </button>
+
+                <!-- Notification -->
+                <button class="nav-icon-btn" id="notifBtn" aria-label="Notifikasi">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                        <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                    </svg>
+                    <span class="badge hidden" id="notifBadge">0</span>
+                </button>
+
+                <!-- Profile -->
+                <button class="nav-icon-btn" id="profileBtn" aria-label="Profil">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                        <circle cx="12" cy="7" r="4"/>
+                    </svg>
+                </button>
+
+                <!-- Mobile Hamburger -->
+                <button class="hamburger" id="hamburger" aria-label="Menu">
+                    <span></span><span></span><span></span>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- ========== DASHBOARD ========== -->
+    <main class="dashboard">
+        <div class="container">
+
+            <!-- ===== KPI CARDS ===== -->
+            <section class="dashboard-section" id="kpiSection">
+                <div class="kpi-grid">
+                    <!-- Saldo Operasional -->
+                    <div class="kpi-card animate-in" style="opacity:0">
+                        <div class="kpi-header">
+                            <div class="kpi-icon-wrap">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                    <rect x="2" y="4" width="20" height="16" rx="3"/>
+                                    <path d="M2 10h20"/>
+                                </svg>
+                            </div>
+                        </div>
+                        <span class="kpi-label">Saldo Operasional</span>
+                        <span class="kpi-value" id="kpiOperasional">Rp 0</span>
+                        <span class="kpi-sub">Dana kebutuhan sehari-hari</span>
+                    </div>
+
+                    <!-- Total Tabungan -->
+                    <div class="kpi-card animate-in" style="opacity:0">
+                        <div class="kpi-header">
+                            <div class="kpi-icon-wrap">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M19 5c-1.5 0-2.8 1.4-3 2-3.5-1.4-11-.3-11 4 0 5 4.5 8 9 8 2.5 0 5-1 6.5-2.5M19 5v4"/>
+                                    <path d="M22 8c0 1.5-1 2-2 2h-1"/>
+                                    <circle cx="9" cy="12" r="1" fill="currentColor"/>
+                                </svg>
+                            </div>
+                        </div>
+                        <span class="kpi-label">Total Tabungan</span>
+                        <span class="kpi-value" id="kpiTabungan">Rp 0</span>
+                        <span class="kpi-sub">Simpanan serius kerajaan</span>
+                    </div>
+
+                    <!-- Total Pengeluaran -->
+                    <div class="kpi-card animate-in" style="opacity:0">
+                        <div class="kpi-header">
+                            <div class="kpi-icon-wrap">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                                </svg>
+                            </div>
+                        </div>
+                        <span class="kpi-label">Total Pengeluaran</span>
+                        <span class="kpi-value" id="kpiPengeluaran">Rp 0</span>
+                        <span class="kpi-sub">Akumulasi semua pengeluaran</span>
+                    </div>
+
+                    <!-- Sisa Saldo -->
+                    <div class="kpi-card animate-in" style="opacity:0">
+                        <div class="kpi-header">
+                            <div class="kpi-icon-wrap">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                                </svg>
+                            </div>
+                        </div>
+                        <span class="kpi-label">Sisa Saldo</span>
+                        <span class="kpi-value" id="kpiSisaSaldo">Rp 0</span>
+                        <span class="kpi-sub">Operasional + Tabungan</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ===== INPUT PANELS ===== -->
+            <section class="dashboard-section" id="inputSection">
+                <div class="notebook-container animate-in" style="opacity:0">
+                    <!-- Floating Orange Header -->
+                    <div class="pusat-header">
+                        <svg viewBox="0 0 24 24" fill="none" class="icon" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                            <polyline points="14 2 14 8 20 8"/>
+                            <line x1="12" y1="18" x2="12" y2="12"/>
+                            <line x1="9" y1="15" x2="15" y2="15"/>
+                        </svg>
+                        PUSAT PENCATATAN
+                    </div>
+
+                    <div class="notebook-tabs">
+                        <button class="notebook-tab active tab-expense-btn" onclick="switchNotebookTab('expense')" id="tabBtn-expense">
+                            <span class="tab-text">PENGELUARAN</span>
+                            <svg viewBox="0 0 24 24" fill="#fecaca" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path>
+                                <line x1="3" y1="6" x2="21" y2="6"></line>
+                                <path d="M16 10a4 4 0 0 1-8 0"></path>
+                            </svg>
+                        </button>
+                        <button class="notebook-tab tab-income-btn" onclick="switchNotebookTab('income')" id="tabBtn-income">
+                            <span class="tab-text">PEMASUKAN</span>
+                            <svg viewBox="0 0 24 24" fill="#bbf7d0" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="2" y="6" width="20" height="12" rx="2"></rect>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                        </button>
+                        <button class="notebook-tab tab-transfer-btn" onclick="switchNotebookTab('transfer')" id="tabBtn-transfer">
+                            <span class="tab-text">TRANSFER</span>
+                            <svg viewBox="0 0 24 24" fill="#bfdbfe" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                                <line x1="22" y1="2" x2="11" y2="13"></line>
+                            </svg>
+                        </button>
+                    </div>
+
+                    <div class="notebook-content">
+                        <!-- === PANEL: Catat Pengeluaran === -->
+                        <div class="panel panel-expense notebook-page active" id="page-expense">
+                            <div class="form-group">
+                                <label class="form-label" for="expCategory">Kategori</label>
+                                <select class="form-select" id="expCategory"></select>
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label" for="expAmount">Nominal</label>
+                                <div class="form-input-with-prefix">
+                                    <span class="form-prefix">Rp</span>
+                                    <input type="number" class="form-input" id="expAmount" placeholder="0" min="0">
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label" for="expSource">Diambil Dari</label>
+                                <select class="form-select" id="expSource">
+                                    <option value="operasional">Saldo Operasional</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label" for="expDesc">Keterangan</label>
+                                <input type="text" class="form-input" id="expDesc" placeholder="Beli apa hari ini?">
+                            </div>
+
+                            <!-- ===== CAMERA PHOTO (OPTIONAL) ===== -->
+                            <div class="form-group camera-section" id="cameraSection">
+                                <label class="form-label">Foto Bukti <span class="label-optional">(Opsional)</span></label>
+
+                                <!-- Action Buttons -->
+                                <div class="camera-action-group">
+                                    <button type="button" class="btn-camera-action" id="btnCameraToggle" onclick="toggleCamera()">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                                            <circle cx="12" cy="13" r="4"/>
+                                        </svg>
+                                        <span id="cameraToggleText">Buka Kamera</span>
+                                    </button>
+                                    <button type="button" class="btn-camera-action btn-upload" onclick="document.getElementById('photoUploadInput').click()">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                            <polyline points="17 8 12 3 7 8"></polyline>
+                                            <line x1="12" y1="3" x2="12" y2="15"></line>
+                                        </svg>
+                                        <span>Upload Foto</span>
+                                    </button>
+                                    <input type="file" id="photoUploadInput" accept="image/*" style="display:none;" onchange="handlePhotoUpload(event)">
+                                </div>
+
+                                <!-- Viewfinder -->
+                                <div class="camera-viewfinder-wrap hidden" id="cameraViewfinderWrap">
+                                    <div class="camera-viewfinder-inner">
+                                        <video id="cameraVideo" autoplay playsinline muted></video>
+                                        <div class="viewfinder-corner tl"></div>
+                                        <div class="viewfinder-corner tr"></div>
+                                        <div class="viewfinder-corner bl"></div>
+                                        <div class="viewfinder-corner br"></div>
+                                    </div>
+                                    <button type="button" class="btn-shutter" id="btnShutter" onclick="capturePhoto()">
+                                        <span class="shutter-ring"></span>
+                                    </button>
+                                </div>
+
+                                <!-- Hidden processing canvas -->
+                                <canvas id="cameraCanvas" style="display:none;"></canvas>
+
+                                <!-- Photo Preview (Polaroid Style) -->
+                                <div class="camera-preview-wrap hidden" id="cameraPreviewWrap">
+                                    <div class="camera-preview-polaroid">
+                                        <img id="cameraPreviewImg" alt="Foto bukti pengeluaran">
+                                        <div class="polaroid-caption" id="polaroidCaption"></div>
+                                    </div>
+                                    
+                                    <div class="photo-location-wrap hidden" id="photoLocationWrap">
+                                        <a href="#" target="_blank" id="photoLocationLink" class="photo-location-link">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+                                            Lihat di Maps
+                                        </a>
+                                    </div>
+
+                                    <button type="button" class="btn-retake" id="btnRetake" onclick="retakePhoto()">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                            <polyline points="1 4 1 10 7 10"></polyline>
+                                            <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+                                        </svg>
+                                        Foto Ulang
+                                    </button>
+                                </div>
+                            </div>
+
+                            <button class="btn btn-red mt-sm" id="btnExpense" onclick="submitExpense()">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                                Catat Pengeluaran
+                            </button>
+                        </div>
+
+                        <!-- === PANEL: Catat Pemasukan === -->
+                        <div class="panel panel-income notebook-page" id="page-income" style="display:none;">
+                            <div class="form-group">
+                                <label class="form-label" for="incAmount">Nominal</label>
+                                <div class="form-input-with-prefix">
+                                    <span class="form-prefix">Rp</span>
+                                    <input type="number" class="form-input" id="incAmount" placeholder="0" min="0">
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label" for="incDest">Tujuan Pemasukan</label>
+                                <select class="form-select" id="incDest">
+                                    <option value="operasional">Uang Operasional</option>
+                                    <option value="khilaf">Uang Khilaf (Fun Money)</option>
+                                    <option value="tabungan">Tabungan</option>
+                                </select>
+                            </div>
+
+                            <!-- Sub-select: pilih goal tabungan -->
+                            <div class="sub-select-group" id="incGoalGroup">
+                                <div class="form-group">
+                                    <label class="form-label" for="incGoal">Tabungan Untuk</label>
+                                    <select class="form-select" id="incGoal"></select>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label" for="incDesc">Keterangan</label>
+                                <input type="text" class="form-input" id="incDesc" placeholder="Sumber pemasukan">
+                            </div>
+
+                            <button class="btn btn-green mt-sm" id="btnIncome" onclick="submitIncome()">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                                Catat Pemasukan
+                            </button>
+                        </div>
+
+                        <!-- === PANEL: Transfer Dana === -->
+                        <div class="panel panel-transfer notebook-page" id="page-transfer" style="display:none;">
+                            <div class="form-group">
+                                <label class="form-label" for="trfFrom">Dari</label>
+                                <select class="form-select" id="trfFrom">
+                                    <option value="operasional">Saldo Operasional</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label" for="trfTo">Ke</label>
+                                <select class="form-select" id="trfTo">
+                                    <option value="operasional">Saldo Operasional</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label" for="trfAmount">Nominal</label>
+                                <div class="form-input-with-prefix">
+                                    <span class="form-prefix">Rp</span>
+                                    <input type="number" class="form-input" id="trfAmount" placeholder="0" min="0">
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label" for="trfDesc">Keterangan</label>
+                                <input type="text" class="form-input" id="trfDesc" placeholder="Alasan transfer (opsional)">
+                            </div>
+
+                            <button class="btn btn-blue mt-sm" id="btnTransfer" onclick="submitTransfer()">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/></svg>
+                                Pindahkan Dana
+                            </button>
                         </div>
                     </div>
                 </div>
-
-                <button id="openStatusMisiBtn" class="radar-settings-btn" aria-label="Buka Status Misi">⚙</button>
             </section>
-        </div>
 
-        <!-- BOTTOM TIER: EXECUTION & DATA ENTRY -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-stretch pt-2">
-            <!-- Card Tabungan -->
-            <section class="comic-panel p-6 md:p-8 bg-white border-green-500 border-4 flex flex-col shadow-[8px_8px_0px_0px_#22c55e]">
-                <h2 class="text-2xl md:text-3xl font-black uppercase tracking-wider flex items-center border-b-4 border-green-500 pb-4 text-green-700"><span class="text-4xl mr-3">💰</span> PETI HARTA KERAJAAN</h2>
-                <p class="font-bold text-green-700 mt-4 text-base md:text-lg">Timbun pundi-pundi emas untuk masa depan kerajaan! Sedikit-sedikit jadi bukit emas. 🏰</p>
-                <div class="flex flex-col gap-4 mt-6">
-                    <input type="text" id="namaTabungan" placeholder="Nimbun untuk apa? 👑" class="p-3 comic-input font-bold text-lg">
-                    <input type="number" id="jumlahTabungan" placeholder="Berapa keping emas? 💰" class="p-3 comic-input font-bold text-lg">
-                    <select id="kategoriTabungan" class="p-3 comic-input font-bold appearance-none bg-white text-lg">
-                        <option value="Emas Batangan">Emas Batangan</option>
-                        <option value="Rekening Rahasia">Rekening Rahasia</option>
-                        <option value="Saham/Investasi">Saham/Investasi</option>
-                    </select>
-                    <button onclick="catatTransaksi('saving')" class="comic-btn comic-btn-green py-3 px-8 text-xl whitespace-nowrap mt-2">TIMBUN HARTA!</button>
+            <!-- ===== CHARTS ===== -->
+            <section class="dashboard-section" id="chartsSection">
+                <div class="section-title">
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21.21 15.89A10 10 0 1 1 8 2.83"/>
+                        <path d="M22 12A10 10 0 0 0 12 2v10z"/>
+                    </svg>
+                    Analisis Keuangan
+                </div>
+                <div class="chart-carousel animate-in" style="opacity:0">
+                    <button class="slide-nav-btn prev" onclick="changeChartSlide(-1)" aria-label="Previous Slide">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                    </button>
+                    <button class="slide-nav-btn next" onclick="changeChartSlide(1)" aria-label="Next Slide">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                    </button>
+
+                    <div class="chart-carousel-header">
+                        <span id="carouselIcon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21.21 15.89A10 10 0 1 1 8 2.83"/>
+                                <path d="M22 12A10 10 0 0 0 12 2v10z"/>
+                            </svg>
+                        </span>
+                        <span id="carouselTitle">Distribusi Pengeluaran</span>
+                    </div>
+
+                    <div class="chart-slides-container">
+                        <!-- Slide 1: Donut -->
+                        <div class="chart-slide active" data-title="Distribusi Pengeluaran" data-icon="<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><path d='M21.21 15.89A10 10 0 1 1 8 2.83'/><path d='M22 12A10 10 0 0 0 12 2v10z'/></svg>">
+                            <div class="chart-wrap" id="donutChartWrap">
+                                <canvas id="donutChart"></canvas>
+                            </div>
+                        </div>
+
+                        <!-- Slide 2: Bar -->
+                        <div class="chart-slide" data-title="Pengeluaran Harian (Bulan Ini)" data-icon="<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><rect x='3' y='12' width='4' height='8' rx='1'/><rect x='10' y='8' width='4' height='12' rx='1'/><rect x='17' y='4' width='4' height='16' rx='1'/></svg>">
+                            <div class="chart-wrap" id="barChartWrap">
+                                <canvas id="barChart"></canvas>
+                            </div>
+                        </div>
+
+                        <!-- Slide 3: Line -->
+                        <div class="chart-slide" data-title="Trend Pengeluaran (7 Hari Terakhir)" data-icon="<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='22 12 18 12 15 21 9 3 6 12 2 12'/></svg>">
+                            <div class="chart-wrap" id="lineChartWrap">
+                                <canvas id="lineChart"></canvas>
+                            </div>
+                        </div>
+
+                        <!-- Slide 4: Table -->
+                        <div class="chart-slide" data-title="Hari Pengeluaran Tertinggi" data-icon="<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><polygon points='12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2'/></svg>">
+                            <div id="topDaysWrap" style="width:100%; max-width: 600px; margin: 0 auto; min-height: 250px;">
+                                <div class="empty-chart-msg" id="topDaysEmpty">
+                                    Belum ada data pengeluaran untuk ditampilkan
+                                </div>
+                                <table class="top-days-table hidden" id="topDaysTable">
+                                    <thead>
+                                        <tr>
+                                            <th>#</th>
+                                            <th>Tanggal</th>
+                                            <th>Total</th>
+                                            <th>Transaksi</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="topDaysBody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Slide 5: Radar -->
+                        <div class="chart-slide" data-title="Wiggly Radar Kekayaan" data-icon="<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><polygon points='12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2'/><line x1='12' y1='22' x2='12' y2='2'/><line x1='22' y1='8.5' x2='2' y2='15.5'/><line x1='2' y1='8.5' x2='22' y2='15.5'/></svg>">
+                            <div class="chart-wrap" id="radarChartWrap" style="display:flex; flex-direction:column; align-items:center;">
+                                <canvas id="radarChart" class="wiggly-radar-canvas"></canvas>
+                                <p class="wiggly-quote">"Kekayaan Anda terlihat goyang-goyang sedikit."</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="carousel-indicators" id="chartIndicators">
+                        <span class="indicator active" onclick="goToChartSlide(0)"></span>
+                        <span class="indicator" onclick="goToChartSlide(1)"></span>
+                        <span class="indicator" onclick="goToChartSlide(2)"></span>
+                        <span class="indicator" onclick="goToChartSlide(3)"></span>
+                        <span class="indicator" onclick="goToChartSlide(4)"></span>
+                    </div>
                 </div>
             </section>
-            <!-- Card Pengeluaran -->
-            <section class="comic-panel p-6 md:p-8 bg-white border-red-500 border-4 flex flex-col shadow-[8px_8px_0px_0px_#ef4444]">
-                <h2 class="text-2xl md:text-3xl font-black uppercase tracking-wider flex items-center border-b-4 border-red-500 pb-4 text-red-600"><span class="text-4xl mr-3">🔥</span> GULUNGAN DOSA KERAJAAN</h2>
-                <p class="font-bold text-red-600 mt-4 text-base md:text-lg">Catat dosa finansial kalian dari Kantong Hidup (50%). Jangan bohong pada catatan! 😈</p>
-                <div class="flex flex-col gap-4 mt-6">
-                    <input type="text" id="namaPengeluaran" placeholder="Beli apa hari ini? 🍔" class="p-3 comic-input font-bold text-lg">
-                    <input type="number" id="jumlahPengeluaran" placeholder="Habis berapa? 💸" class="p-3 comic-input font-bold text-lg">
-                    <select id="kategoriPengeluaran" class="p-3 comic-input font-bold appearance-none bg-white text-lg">
-                        <option value="Ransum (Pangan)">Ransum (Pangan)</option>
-                        <option value="Pajak/Tagihan">Pajak/Tagihan</option>
-                        <option value="Foya-foya (Hiburan)">Foya-foya (Hiburan)</option>
-                        <option value="Obat/Darurat">Obat/Darurat</option>
-                    </select>
-                    <button onclick="catatTransaksi('expense')" class="comic-btn bg-[#ef4444] py-3 px-8 text-xl whitespace-nowrap mt-2">CATAT DOSA!</button>
-                </div>
-            </section>
+
         </div>
     </main>
 
-    <div id="statusMisiModal" class="status-modal hidden" aria-hidden="true">
-        <div id="statusMisiBackdrop" class="status-modal-backdrop"></div>
-        <section class="status-modal-content">
-            <div class="flex items-center justify-between border-b-4 border-black pb-2 mb-5">
-                <h3 class="text-xl md:text-2xl font-black uppercase tracking-wide flex items-center gap-2 text-amber-900"><span class="text-2xl">🎯</span>Status Misi</h3>
-                <button id="closeStatusMisiBtn" class="status-close-btn" aria-label="Tutup Status Misi">✕</button>
+    </div> <!-- End of appContainer -->
+
+    <!-- ========== MODAL: Kelola Kategori Pengeluaran ========== -->
+    <div class="modal-overlay" id="categoryModal">
+        <div class="modal-backdrop" onclick="closeModal('categoryModal')"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="modal-title">Kelola Kategori</span>
+                <button class="modal-close" onclick="closeModal('categoryModal')">x</button>
             </div>
-
-            <div class="flex flex-col gap-4">
-                <div>
-                    <label class="block text-sm font-bold mb-1 uppercase text-amber-800">Target Tabungan</label>
-                    <input type="number" id="inputTargetTabungan" class="w-full p-3 comic-input text-xl font-bold text-green-700 bg-white" value="3000000" oninput="updateKalkulasi()">
-                </div>
-
-                <div>
-                    <div class="progress-bar-container">
-                        <div id="tabunganProgress" class="progress-bar-fill"></div>
-                    </div>
-                    <p class="text-right font-black mt-2 text-sm"><span id="persenTabungan">0</span>% TERCAPAI DARI TARGET</p>
-                </div>
-
-                <div class="status-mini-grid">
-                    <div class="status-mini-card">
-                        <span class="status-mini-label">Tabungan Terkumpul</span>
-                        <span id="statusTotalTabungan" class="status-mini-value">Rp 0</span>
-                    </div>
-                    <div class="status-mini-card">
-                        <span class="status-mini-label">Sisa Menuju Target</span>
-                        <span id="statusSisaTarget" class="status-mini-value">Rp 0</span>
-                    </div>
-                </div>
+            <div class="item-list" id="categoryList"></div>
+            <div class="modal-add-row">
+                <input type="text" class="form-input" id="newCategoryInput" placeholder="Nama kategori baru" style="flex: 1">
+                <button class="btn btn-sm btn-amber" onclick="addCategory()">Tambah</button>
             </div>
-        </section>
+        </div>
     </div>
 
-    <!-- LEDGER VIEW (BUKU BESAR) -->
-    <main id="viewLedger" class="max-w-7xl mx-auto hidden">
-        <section class="comic-panel p-8 bg-gray-50 border-4 border-black">
-            <div class="flex flex-col md:flex-row justify-between items-center mb-6 border-b-4 border-black pb-4">
-                <h2 class="text-4xl font-black uppercase tracking-wider flex items-center"><span class="text-5xl mr-4">📜</span> Gulungan Buku Besar</h2>
-                <div class="flex gap-2 mt-4 md:mt-0">
-                    <!-- <span class="px-3 py-1 bg-blue-200 border-2 border-black font-bold rounded text-sm shadow-[2px_2px_0px_0px_#000]">Pemasukan</span> -->
-                    <span class="px-3 py-1 bg-green-200 border-2 border-black font-bold rounded text-sm shadow-[2px_2px_0px_0px_#000]">Tabungan</span>
-                    <span class="px-3 py-1 bg-red-200 border-2 border-black font-bold rounded text-sm shadow-[2px_2px_0px_0px_#000]">Pengeluaran</span>
-                </div>
+    <!-- ========== MODAL: Kelola Tujuan Tabungan ========== -->
+    <div class="modal-overlay" id="goalsModal">
+        <div class="modal-backdrop" onclick="closeModal('goalsModal')"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="modal-title">Kelola Rekening Tabungan</span>
+                <button class="modal-close" onclick="closeModal('goalsModal')">x</button>
             </div>
+            <div class="item-list" id="goalsList"></div>
+        </div>
+    </div>
 
-            <p class="mb-6 text-lg font-bold text-gray-700">Pusat pencatatan seluruh mutasi harta kerajaan tanpa terkecuali.</p>
-
-            <div class="border-4 border-black rounded-xl overflow-hidden shadow-[8px_8px_0px_0px_#000000] bg-white">
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left border-collapse min-w-[600px]">
-                        <thead>
-                            <tr class="bg-amber-300 text-black uppercase text-xl border-b-4 border-black">
-                                <th class="p-4 border-r-4 border-black">Waktu Titah</th>
-                                <th class="p-4 border-r-4 border-black">Jenis & Kategori</th>
-                                <th class="p-4 border-r-4 border-black">Keterangan</th>
-                                <th class="p-4 text-right">Nilai Mutasi</th>
-                            </tr>
-                        </thead>
-                        <tbody id="tabelBukuBesar" class="text-lg font-bold">
-                            <!-- Rows go here -->
-                        </tbody>
-                    </table>
-                </div>
-                <div id="emptyLedgerMessage" class="p-8 text-center font-black text-gray-400 text-2xl uppercase">
-                    Gulungan Masih Kosong. Belum Ada Titah.
-                </div>
-            </div>
-        </section>
-    </main>
+    <!-- ========== TOAST CONTAINER ========== -->
+    <div class="toast-container" id="toastContainer"></div>
 
     <script src="script.js"></script>
 </body>
