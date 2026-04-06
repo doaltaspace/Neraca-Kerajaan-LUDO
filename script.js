@@ -8,6 +8,7 @@ const SK = {
   goals: 'nk_goals',
   categories: 'nk_categories',
   theme: 'nk_theme',
+  notifications: 'nk_notifications',
 };
 
 // ===== DEFAULT DATA =====
@@ -34,6 +35,7 @@ let state = {
   goals: [],
   categories: [],
   theme: 'light',
+  notifications: [],
 };
 
 // ===== AUDIO ENGINE =====
@@ -168,6 +170,7 @@ const saveState = () => {
     localStorage.setItem(SK.goals, JSON.stringify(state.goals));
     localStorage.setItem(SK.categories, JSON.stringify(state.categories));
     localStorage.setItem(SK.theme, state.theme);
+    localStorage.setItem(SK.notifications, JSON.stringify(state.notifications));
   } catch (e) {
     console.warn('Save failed:', e);
   }
@@ -179,23 +182,86 @@ const loadState = () => {
     const goals = localStorage.getItem(SK.goals);
     const cats = localStorage.getItem(SK.categories);
     const theme = localStorage.getItem(SK.theme);
+    const notifs = localStorage.getItem(SK.notifications);
 
     state.transactions = tx ? JSON.parse(tx) : [];
     state.goals = goals ? JSON.parse(goals) : [...DEFAULT_GOALS];
     state.categories = cats ? JSON.parse(cats) : [...DEFAULT_CATEGORIES];
     state.theme = theme || 'light';
+    state.notifications = notifs ? JSON.parse(notifs) : [];
   } catch (e) {
     console.warn('Load failed:', e);
     state.transactions = [];
     state.goals = [...DEFAULT_GOALS];
     state.categories = [...DEFAULT_CATEGORIES];
     state.theme = 'light';
+    state.notifications = [];
+  }
+  updateNotifBadge();
+};
+
+// ===== TOAST & NOTIFICATIONS =====
+const updateNotifBadge = () => {
+  const badge = $('notifBadge');
+  if (!badge) return;
+  const unreadCount = state.notifications.filter(n => !n.read).length;
+  if (unreadCount > 0) {
+    badge.textContent = unreadCount > 99 ? '99+' : unreadCount;
+    badge.classList.remove('hidden');
+  } else {
+    badge.classList.add('hidden');
   }
 };
 
-// ===== TOAST =====
+const renderNotifications = () => {
+  const list = $('notifList');
+  if (!list) return;
+  
+  if (state.notifications.length === 0) {
+    list.innerHTML = '<div style="text-align:center; padding:20px; color:var(--text-muted);">Belum ada notifikasi</div>';
+    return;
+  }
+  
+  list.innerHTML = state.notifications.map(n => `
+    <div class="item-row" style="align-items:flex-start; margin-bottom: 8px;">
+      <div style="margin-right: 12px; margin-top:2px; font-size:1.2rem;">
+        ${n.type === 'error' ? '🔴' : '🟢'}
+      </div>
+      <div style="flex:1;">
+        <div style="font-weight:700; color:var(--text-primary); font-size:0.9rem;">${escHtml(n.message)}</div>
+        <div style="font-size:0.7rem; color:var(--text-muted); margin-top:4px;">${formatDateTime(n.date)} • 👤 ${escHtml(n.user || 'Sistem')}</div>
+      </div>
+    </div>
+  `).join('');
+};
+
+const openNotifModal = () => {
+  openModal('notifModal');
+  renderNotifications();
+  // Mark all as read
+  if (state.notifications.some(n => !n.read)) {
+    state.notifications.forEach(n => n.read = true);
+    saveState();
+    updateNotifBadge();
+  }
+};
+
 const showToast = (message, type = 'success') => {
   if (type === 'error') playSound('error');
+
+  const loggedInUser = sessionStorage.getItem('nk_loggedInUser') || localStorage.getItem('nk_loggedInUser') || 'Sistem';
+
+  state.notifications.unshift({
+    id: uid(),
+    message,
+    type,
+    user: loggedInUser,
+    date: new Date().toISOString(),
+    read: false
+  });
+  if (state.notifications.length > 50) state.notifications.pop();
+  saveState();
+  updateNotifBadge();
 
   const toast = document.createElement('div');
   toast.className = `toast ${type}`;
@@ -207,6 +273,10 @@ const showToast = (message, type = 'success') => {
     setTimeout(() => toast.remove(), 320);
   }, 2800);
 };
+
+if ($('notifBtn')) {
+  $('notifBtn').addEventListener('click', openNotifModal);
+}
 
 const triggerConfetti = () => {
   for (let i = 0; i < 40; i++) {
@@ -272,21 +342,17 @@ const renderCategoryList = () => {
   list.innerHTML = '';
 
   state.categories.forEach((cat, idx) => {
-    const isDefault = DEFAULT_CATEGORIES.includes(cat);
     const row = document.createElement('div');
-    row.className = `item-row ${isDefault ? 'item-row-default' : ''}`;
+    row.className = `item-row`;
     row.innerHTML = `
       <div class="item-row-name">
         <span>${escHtml(cat)}</span>
-        ${isDefault ? '<span class="item-default-badge">Default</span>' : ''}
       </div>
-      ${!isDefault ? `
-        <button class="item-delete-btn" onclick="deleteCategory(${idx})" aria-label="Hapus ${escHtml(cat)}">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-          </svg>
-        </button>
-      ` : ''}
+      <button class="item-delete-btn" onclick="deleteCategory(${idx})" aria-label="Hapus ${escHtml(cat)}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
     `;
     list.appendChild(row);
   });
@@ -310,7 +376,6 @@ const addCategory = () => {
 
 const deleteCategory = (idx) => {
   const cat = state.categories[idx];
-  if (DEFAULT_CATEGORIES.includes(cat)) return;
 
   state.categories.splice(idx, 1);
   saveState();
@@ -329,20 +394,17 @@ const renderGoalsList = () => {
     const percent = goal.target > 0 ? Math.min(100, Math.round((balance / goal.target) * 100)) : 0;
 
     const row = document.createElement('div');
-    row.className = `item-row goal-row ${goal.isDefault ? 'item-row-default' : ''}`;
+    row.className = `item-row goal-row`;
     row.innerHTML = `
       <div class="goal-top">
         <div class="item-row-name">
           <span>${escHtml(goal.name)}</span>
-          ${goal.isDefault ? '<span class="item-default-badge">Default</span>' : ''}
         </div>
-        ${!goal.isDefault ? `
-          <button class="item-delete-btn" onclick="deleteGoal('${goal.id}')" aria-label="Hapus ${escHtml(goal.name)}">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-            </svg>
-          </button>
-        ` : ''}
+        <button class="item-delete-btn" onclick="deleteGoal('${goal.id}')" aria-label="Hapus ${escHtml(goal.name)}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
       </div>
       ${goal.target > 0 ? `
         <div class="goal-progress">
@@ -386,7 +448,7 @@ const addGoal = () => {
 
 const deleteGoal = (goalId) => {
   const goal = state.goals.find((g) => g.id === goalId);
-  if (!goal || goal.isDefault) return;
+  if (!goal) return;
 
   const balance = getGoalBalance(goalId);
   if (balance > 0) {
@@ -566,9 +628,25 @@ const recalculate = () => {
   updateTopDays();
 };
 
-// ===== SUBMIT TRANSACTIONS =====
+// ===== NOMINAL INPUT COMPONENT =====
+const parseNominal = (val) => {
+  if (!val) return 0;
+  return parseInt(val.toString().replace(/\D/g, ''), 10) || 0;
+};
+
+const formatNominalInput = (e) => {
+  const val = e.target.value.replace(/\D/g, '');
+  if (!val) {
+    e.target.value = '';
+    return;
+  }
+  e.target.value = parseInt(val, 10).toLocaleString('id-ID');
+};
+
+// ===== RECORD SUBMISSION =====
+
 const submitExpense = () => {
-  const amount = Number(expAmount.value) || 0;
+  const amount = parseNominal(expAmount.value);
   const category = expCategory.value;
   const source = expSource.value;
   const desc = expDesc.value.trim();
@@ -610,7 +688,7 @@ const submitExpense = () => {
 };
 
 const submitIncome = () => {
-  const amount = Number(incAmount.value) || 0;
+  const amount = parseNominal(incAmount.value);
   let dest = incDest.value;
   const desc = incDesc.value.trim();
 
@@ -647,7 +725,7 @@ const submitIncome = () => {
 };
 
 const submitTransfer = () => {
-  const amount = Number(trfAmount.value) || 0;
+  const amount = parseNominal(trfAmount.value);
   const from = trfFrom.value;
   const to = trfTo.value;
   const desc = trfDesc.value.trim();
@@ -726,6 +804,7 @@ const initCharts = () => {
         borderColor: state.theme === 'dark' ? '#222244' : '#fdf6e3',
         borderWidth: 3,
         hoverOffset: 8,
+        borderRadius: 16,
       }],
     },
     options: {
@@ -1101,21 +1180,28 @@ const goToChartSlide = (index) => {
 // ===== NOTEBOOK TABS =====
 const switchNotebookTab = (tabName) => {
   playSound('pop');
+  
+  const container = document.getElementById('mainNotebookContainer');
+  const btn = document.getElementById(`tabBtn-${tabName}`);
+  
+  if (container && container.classList.contains('is-open') && btn && btn.classList.contains('active')) {
+      container.classList.remove('is-open');
+      btn.classList.remove('active');
+      return;
+  }
+
   // Stop camera if leaving expense tab
   if (tabName !== 'expense') {
     stopCameraStream();
   }
 
-  // Update Tabs
   document.querySelectorAll('.notebook-tab').forEach(t => t.classList.remove('active'));
-  const activeTab = document.getElementById(`tabBtn-${tabName}`);
-  if (activeTab) activeTab.classList.add('active');
-
-  // Hide all pages
   document.querySelectorAll('.notebook-page').forEach(p => {
     p.style.display = 'none';
     p.classList.remove('animate-in'); // Reset animation
   });
+
+  if (btn) btn.classList.add('active');
 
   // Show active page
   const activePage = document.getElementById(`page-${tabName}`);
@@ -1126,18 +1212,34 @@ const switchNotebookTab = (tabName) => {
       activePage.classList.add('animate-in');
     }, 10);
   }
+  
+  if (container && !container.classList.contains('is-open')) {
+      container.classList.add('is-open');
+  }
 };
 
 // ===== CAMERA SYSTEM =====
 let cameraStream = null;
 let capturedPhotoDataUrl = null;
-let currentLocation = null;
+let currentAddress = null;
 
 const fetchLocation = () => {
-  if (!currentLocation && navigator.geolocation) {
+  if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         currentLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        
+        // Reverse geocode for full address
+        if (!currentAddress) {
+          fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${currentLocation.lat}&lon=${currentLocation.lng}&zoom=18&addressdetails=1`)
+            .then(r => r.json())
+            .then(data => {
+              if (data && data.display_name) {
+                currentAddress = data.display_name;
+              }
+            })
+            .catch(() => {});
+        }
       },
       () => { console.warn("Location access denied or failed."); }
     );
@@ -1159,6 +1261,10 @@ const stopCameraStream = () => {
   if (viewfinder) viewfinder.classList.add('hidden');
   if (toggleBtn) toggleBtn.classList.remove('camera-active');
   if (toggleText) toggleText.textContent = 'Buka Kamera';
+  
+  if (typeof retakeFullscreenPhoto === 'function') {
+      retakeFullscreenPhoto();
+  }
 };
 
 const toggleCamera = () => {
@@ -1211,27 +1317,8 @@ const toggleCamera = () => {
 };
 
 const showPreview = () => {
-  const preview = $('cameraPreviewWrap');
-  const previewImg = $('cameraPreviewImg');
-  const caption = $('polaroidCaption');
-  const locWrap = $('photoLocationWrap');
-  const locLink = $('photoLocationLink');
-
-  previewImg.src = capturedPhotoDataUrl;
-
-  const now = new Date();
-  caption.textContent = `📸 ${now.toLocaleDateString('id-ID', {
-    weekday: 'short', day: 'numeric', month: 'short', year: 'numeric'
-  })} • ${now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}`;
-
-  if (currentLocation) {
-    locLink.href = `https://www.google.com/maps/search/?api=1&query=${currentLocation.lat},${currentLocation.lng}`;
-    locWrap.classList.remove('hidden');
-  } else {
-    locWrap.classList.add('hidden');
-  }
-
-  preview.classList.remove('hidden');
+  const doneWrap = $('cameraDoneWrap');
+  doneWrap.classList.remove('hidden');
 };
 
 const getOSMTileUrl = (lat, lon, zoom) => {
@@ -1240,7 +1327,7 @@ const getOSMTileUrl = (lat, lon, zoom) => {
   return `https://a.tile.openstreetmap.org/${zoom}/${xtile}/${ytile}.png`;
 };
 
-const drawMapOverlay = (ctx, size, lat, lng, callback) => {
+const drawMapOverlay = (ctx, canvasW, canvasH, lat, lng, callback) => {
   const zoom = 15;
   const url = getOSMTileUrl(lat, lng, zoom);
   const img = new Image();
@@ -1248,28 +1335,32 @@ const drawMapOverlay = (ctx, size, lat, lng, callback) => {
   
   img.onload = () => {
     ctx.save();
-    const mapSize = size * 0.22; 
-    const mapX = size * 0.04;
-    const mapY = size - mapSize - (size * 0.035);
+    const mapSize = canvasW * 0.28;
+    const margin = canvasW * 0.03; // Same margin as timestamp
+    const mapX = margin;
+    const mapY = canvasH - mapSize - margin;
+    const r = 14;
     
-    ctx.shadowColor = 'rgba(26, 26, 46, 0.4)';
-    ctx.shadowBlur = 0;
-    ctx.shadowOffsetX = 3;
-    ctx.shadowOffsetY = 3;
-    
-    ctx.fillStyle = '#fdf6e3';
-    roundRect(ctx, mapX, mapY, mapSize, mapSize, 8);
+    // Shadow
+    ctx.fillStyle = 'rgba(26, 26, 46, 0.55)';
+    roundRect(ctx, mapX + 5, mapY + 5, mapSize, mapSize, r);
     ctx.fill();
     
-    ctx.shadowColor = 'transparent';
-    ctx.lineWidth = 3;
+    // Card bg
+    ctx.fillStyle = '#fdf6e3';
+    roundRect(ctx, mapX, mapY, mapSize, mapSize, r);
+    ctx.fill();
+    
+    // Border
+    ctx.lineWidth = 4;
     ctx.strokeStyle = '#1a1a2e';
-    roundRect(ctx, mapX, mapY, mapSize, mapSize, 8);
+    roundRect(ctx, mapX, mapY, mapSize, mapSize, r);
     ctx.stroke();
 
+    // Draw map tile clipped
     try {
       ctx.save();
-      roundRect(ctx, mapX, mapY, mapSize, mapSize, 8);
+      roundRect(ctx, mapX, mapY, mapSize, mapSize, r);
       ctx.clip();
       ctx.drawImage(img, 0, 0, 256, 256, mapX, mapY, mapSize, mapSize);
       ctx.restore();
@@ -1277,29 +1368,48 @@ const drawMapOverlay = (ctx, size, lat, lng, callback) => {
       console.warn('Map draw failed:', e);
     }
 
-    // Label Map
-    ctx.fillStyle = '#1a1a2e';
-    roundRect(ctx, mapX + 8, mapY - 14, 75, 24, 6);
+    // Label badge — "📍 MAPS"
+    const labelFontSize = Math.round(canvasW * 0.026);
+    ctx.font = `900 ${labelFontSize}px 'Fredoka', sans-serif`;
+    const labelText = '📍 MAPS';
+    const labelMetrics = ctx.measureText(labelText);
+    const labelW = labelMetrics.width + 20;
+    const labelH = labelFontSize + 16;
+    const labelX = mapX + 8;
+    const labelY = mapY + 8;
+
+    ctx.fillStyle = 'rgba(26, 26, 46, 0.9)';
+    roundRect(ctx, labelX, labelY, labelW, labelH, 8);
     ctx.fill();
+    ctx.strokeStyle = 'rgba(252, 211, 77, 0.6)';
+    ctx.lineWidth = 2;
+    roundRect(ctx, labelX, labelY, labelW, labelH, 8);
+    ctx.stroke();
     ctx.fillStyle = '#fdf6e3';
-    ctx.font = `800 ${size * 0.02}px 'Fredoka', sans-serif`;
-    ctx.fillText("📍 MAPS", mapX + 14, mapY + 2);
+    ctx.textBaseline = 'middle';
+    ctx.fillText(labelText, labelX + 10, labelY + labelH / 2);
     
-    // Marker coordinates
+    // Pin marker
     const px = Math.floor((lng + 180) / 360 * Math.pow(2, zoom) * 256);
     const py = Math.floor((1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * Math.pow(2, zoom) * 256);
     
     const markerX = mapX + ((px % 256) / 256) * mapSize;
     const markerY = mapY + ((py % 256) / 256) * mapSize;
 
+    // Pin shadow
+    ctx.fillStyle = 'rgba(26,26,46,0.5)';
+    ctx.beginPath();
+    ctx.arc(markerX + 3, markerY + 3, 10, 0, Math.PI * 2);
+    ctx.fill();
+    // Pin outer
     ctx.fillStyle = '#1a1a2e';
     ctx.beginPath();
-    ctx.arc(markerX, markerY, 8, 0, Math.PI * 2);
+    ctx.arc(markerX, markerY, 10, 0, Math.PI * 2);
     ctx.fill();
-    
+    // Pin inner
     ctx.fillStyle = '#ef6b6b';
     ctx.beginPath();
-    ctx.arc(markerX, markerY, 5, 0, Math.PI * 2);
+    ctx.arc(markerX, markerY, 6, 0, Math.PI * 2);
     ctx.fill();
 
     ctx.restore();
@@ -1310,7 +1420,9 @@ const drawMapOverlay = (ctx, size, lat, lng, callback) => {
   img.src = url;
 };
 
-const capturePhoto = () => {
+let tempPendingPhoto = null;
+
+const capturePhotoFullscreen = () => {
   const video = $('cameraVideo');
   const canvas = $('cameraCanvas');
   const ctx = canvas.getContext('2d');
@@ -1319,36 +1431,109 @@ const capturePhoto = () => {
     return showToast('Kamera belum siap, tunggu sebentar...', 'error');
   }
 
-  const viewfinderInner = document.querySelector('.camera-viewfinder-inner');
-  viewfinderInner.classList.remove('flash');
-  void viewfinderInner.offsetWidth; 
-  viewfinderInner.classList.add('flash');
+  const videoWrap = document.querySelector('.fs-camera-video-wrap');
+  if (videoWrap) {
+    videoWrap.classList.remove('flash');
+    void videoWrap.offsetWidth; 
+    videoWrap.classList.add('flash');
+  }
   playSound('coin');
 
   const vw = video.videoWidth;
   const vh = video.videoHeight;
-  const cropSize = Math.min(vw, vh);
-  const sx = (vw - cropSize) / 2;
-  const sy = (vh - cropSize) / 2;
+  
+  // Calculate crop for 3:4 aspect ratio to match viewfinder
+  const aspect = 3/4;
+  let cropW, cropH, sx, sy;
+  
+  if (vw / vh > aspect) { // Video is wider than 3:4
+      cropH = vh;
+      cropW = vh * aspect;
+      sx = (vw - cropW) / 2;
+      sy = 0;
+  } else { // Video is taller than 3:4
+      cropW = vw;
+      cropH = vw / aspect;
+      sx = 0;
+      sy = (vh - cropH) / 2;
+  }
 
-  const outputSize = 720; 
-  canvas.width = outputSize;
-  canvas.height = outputSize;
+  const outputW = 1920;
+  const outputH = 2560; // 3:4 ratio, ultra high-res for sharp overlays
+  canvas.width = outputW;
+  canvas.height = outputH;
 
-  ctx.drawImage(video, sx, sy, cropSize, cropSize, 0, 0, outputSize, outputSize);
+  ctx.drawImage(video, sx, sy, cropW, cropH, 0, 0, outputW, outputH);
 
   const finalizePhoto = () => {
-    drawComicTimestamp(ctx, outputSize);
-    capturedPhotoDataUrl = canvas.toDataURL('image/jpeg', 0.85);
-    stopCameraStream();
-    showPreview();
+    drawComicTimestamp(ctx, outputW, outputH);
+    tempPendingPhoto = canvas.toDataURL('image/jpeg', 0.92);
+    
+    // Hide viewfinder, show polaroid preview
+    $('cameraViewfinderInner').style.display = 'none';
+    
+    const polaroidWrap = $('fsPolaroidWrap');
+    const polaroidImg = $('fsPolaroidImg');
+    
+    polaroidImg.src = tempPendingPhoto;
+    
+    // Make photo clickable to open maps if location available
+    if (currentLocation) {
+      polaroidImg.style.cursor = 'pointer';
+      polaroidImg.onclick = () => {
+        window.open(`https://www.google.com/maps/search/?api=1&query=${currentLocation.lat},${currentLocation.lng}`, '_blank');
+      };
+    } else {
+      polaroidImg.style.cursor = 'default';
+      polaroidImg.onclick = null;
+    }
+    
+    polaroidWrap.classList.remove('hidden');
+    
+    $('cameraActionStandard').classList.add('hidden');
+    $('cameraActionPreview').classList.remove('hidden');
   };
 
   if (currentLocation) {
-    drawMapOverlay(ctx, outputSize, currentLocation.lat, currentLocation.lng, finalizePhoto);
+    drawMapOverlay(ctx, outputW, outputH, currentLocation.lat, currentLocation.lng, finalizePhoto);
   } else {
     finalizePhoto();
   }
+};
+
+const retakeFullscreenPhoto = () => {
+    tempPendingPhoto = null;
+    const polaroidImg = $('fsPolaroidImg');
+    if (polaroidImg) { polaroidImg.onclick = null; polaroidImg.style.cursor = 'default'; }
+    $('fsPolaroidWrap').classList.add('hidden');
+    $('cameraViewfinderInner').style.display = '';
+    $('cameraActionStandard').classList.remove('hidden');
+    $('cameraActionPreview').classList.add('hidden');
+};
+
+const acceptPhoto = () => {
+    if (tempPendingPhoto) {
+        capturedPhotoDataUrl = tempPendingPhoto;
+        stopCameraStream();
+        showPreview();
+        $('cameraViewfinderWrap').classList.add('hidden');
+        retakeFullscreenPhoto();
+    }
+};
+
+const downloadPhoto = () => {
+    if (tempPendingPhoto) {
+        const a = document.createElement('a');
+        const now = new Date();
+        const ts = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`;
+        a.href = tempPendingPhoto;
+        a.download = `bukti_${ts}.jpg`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        playSound('coin');
+        showToast('Foto berhasil diunduh!');
+    }
 };
 
 const handlePhotoUpload = (e) => {
@@ -1371,25 +1556,39 @@ const handlePhotoUpload = (e) => {
       const ctx = canvas.getContext('2d');
       const vw = img.width;
       const vh = img.height;
-      const cropSize = Math.min(vw, vh);
-      const sx = (vw - cropSize) / 2;
-      const sy = (vh - cropSize) / 2;
+      
+      // Crop to 3:4 aspect ratio (portrait)
+      const aspect = 3 / 4;
+      let cropW, cropH, sx, sy;
+      
+      if (vw / vh > aspect) {
+        cropH = vh;
+        cropW = vh * aspect;
+        sx = (vw - cropW) / 2;
+        sy = 0;
+      } else {
+        cropW = vw;
+        cropH = vw / aspect;
+        sx = 0;
+        sy = (vh - cropH) / 2;
+      }
 
-      const outputSize = 720;
-      canvas.width = outputSize;
-      canvas.height = outputSize;
+      const outputW = 1920;
+      const outputH = 2560; // 3:4 ratio, ultra high-res
+      canvas.width = outputW;
+      canvas.height = outputH;
 
-      ctx.drawImage(img, sx, sy, cropSize, cropSize, 0, 0, outputSize, outputSize);
+      ctx.drawImage(img, sx, sy, cropW, cropH, 0, 0, outputW, outputH);
       
       const finalizePhoto = () => {
-        drawComicTimestamp(ctx, outputSize);
-        capturedPhotoDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+        drawComicTimestamp(ctx, outputW, outputH);
+        capturedPhotoDataUrl = canvas.toDataURL('image/jpeg', 0.92);
         showPreview();
         playSound('coin');
       };
 
       if (currentLocation) {
-        drawMapOverlay(ctx, outputSize, currentLocation.lat, currentLocation.lng, finalizePhoto);
+        drawMapOverlay(ctx, outputW, outputH, currentLocation.lat, currentLocation.lng, finalizePhoto);
       } else {
         finalizePhoto();
       }
@@ -1400,93 +1599,126 @@ const handlePhotoUpload = (e) => {
   e.target.value = ''; 
 };
 
-const drawComicTimestamp = (ctx, size) => {
+const drawComicTimestamp = (ctx, canvasW, canvasH) => {
   const now = new Date();
+  const h = canvasH || canvasW;
 
-  // Format: "06 Apr 2026"
+  // --- Data ---
+  const dayName = now.toLocaleDateString('id-ID', { weekday: 'long' }).toUpperCase();
   const dateStr = now.toLocaleDateString('id-ID', {
-    day: '2-digit', month: 'short', year: 'numeric'
+    day: '2-digit', month: 'long', year: 'numeric'
   }).toUpperCase();
-
-  // Format: "18:32"
   const timeStr = now.toLocaleTimeString('id-ID', {
-    hour: '2-digit', minute: '2-digit'
+    hour: '2-digit', minute: '2-digit', second: '2-digit'
   });
 
-  const fullText = `${dateStr}  •  ${timeStr}`;
-
-  // --- Background Banner ---
-  const bannerHeight = size * 0.065;
-  const bannerY = size - bannerHeight - (size * 0.035);
-  const bannerPadX = size * 0.04;
-  const fontSize = Math.round(size * 0.032);
-
   ctx.save();
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
 
-  // Measure text to size the banner
-  ctx.font = `900 ${fontSize}px 'Fredoka', sans-serif`;
-  const textMetrics = ctx.measureText(fullText);
-  const textWidth = textMetrics.width;
-  const bannerWidth = textWidth + bannerPadX * 2 + 30; // added extra padding for custom logo
-  const bannerX = size - bannerWidth - (size * 0.03);
+  // --- Sizing ---
+  const margin = canvasW * 0.03;
+  const fDate = Math.round(canvasW * 0.036);
+  const fTime = Math.round(canvasW * 0.030);
+  const fAddr = Math.round(canvasW * 0.020);
+  const padX = canvasW * 0.035;
+  const padTop = canvasW * 0.025;
+  const padBot = canvasW * 0.022;
+  const lineGap = canvasW * 0.008;
 
-  // Banner background — semi-transparent dark with thick border
-  const bannerRadius = 8;
+  // --- Content ---
+  const dateLine = `${dayName}, ${dateStr}`;
+  const timeLine = `${timeStr} WIB`;
 
-  // Shadow behind banner
-  ctx.fillStyle = 'rgba(26, 26, 46, 0.85)';
-  roundRect(ctx, bannerX + 3, bannerY + 3, bannerWidth, bannerHeight, bannerRadius);
+  // Measure banner width to fill the gap next to map
+  const mapSize = canvasW * 0.28;
+  const paddingBetween = margin * 0.5;
+  const bannerWidth = canvasW - mapSize - margin * 2 - paddingBetween;
+  
+  // Word-wrap address
+  const addrLines = [];
+  if (currentAddress) {
+    ctx.font = `700 ${fAddr}px 'Fredoka', sans-serif`;
+    const maxLineW = bannerWidth - padX * 2 - 20; // 20px buffer
+    const parts = currentAddress.split(/,\s*/);
+    let current = '';
+    parts.forEach(part => {
+      const test = current ? current + ', ' + part : part;
+      if (ctx.measureText(test).width > maxLineW && current) {
+        addrLines.push(current + ',');
+        current = part;
+      } else {
+        current = test;
+      }
+    });
+    if (current) addrLines.push(current);
+  }
+
+  const dateLineH = fDate * 1.4;
+  const timeLineH = fTime * 1.4;
+  const addrLineH = fAddr * 1.55;
+  const separatorH = addrLines.length > 0 ? canvasW * 0.02 : 0;
+  const addrBlockH = addrLines.length > 0 ? addrLines.length * addrLineH + canvasW * 0.008 : 0;
+
+  const bannerHeight = padTop + dateLineH + lineGap + timeLineH + separatorH + addrBlockH + padBot;
+  const bannerX = canvasW - bannerWidth - margin;
+  const bannerY = h - bannerHeight - margin;
+  const r = 16;
+
+  // --- Background: solid amber ---
+  // Shadow
+  ctx.fillStyle = 'rgba(26, 26, 46, 0.5)';
+  roundRect(ctx, bannerX + 6, bannerY + 6, bannerWidth, bannerHeight, r);
   ctx.fill();
 
-  // Main banner fill — amber/yellow
-  ctx.fillStyle = 'rgba(252, 211, 77, 0.92)';
-  roundRect(ctx, bannerX, bannerY, bannerWidth, bannerHeight, bannerRadius);
+  // Main fill — warm amber
+  ctx.fillStyle = '#f5b731';
+  roundRect(ctx, bannerX, bannerY, bannerWidth, bannerHeight, r);
   ctx.fill();
 
-  // Banner border — thick black
+  // Border — dark
   ctx.strokeStyle = '#1a1a2e';
-  ctx.lineWidth = 3;
-  roundRect(ctx, bannerX, bannerY, bannerWidth, bannerHeight, bannerRadius);
+  ctx.lineWidth = 4;
+  roundRect(ctx, bannerX, bannerY, bannerWidth, bannerHeight, r);
   ctx.stroke();
 
-  // --- Text with shadow/outline ---
-  const textX = bannerX + bannerPadX + 22; // offset for logo
-  const textY = bannerY + bannerHeight / 2 + fontSize * 0.35;
+  // --- Text (all centered) ---
+  ctx.textBaseline = 'middle';
+  ctx.textAlign = 'center';
+  const centerX = bannerX + bannerWidth / 2;
+  let curY = bannerY + padTop;
 
-  // Text shadow
+  // Date — bold dark
+  ctx.font = `900 ${fDate}px 'Fredoka', sans-serif`;
   ctx.fillStyle = '#1a1a2e';
-  ctx.fillText(fullText, textX + 1.5, textY + 1.5);
+  ctx.fillText(dateLine, centerX, curY + dateLineH / 2);
+  curY += dateLineH + lineGap;
 
-  // Main text
+  // Time — dark
+  ctx.font = `800 ${fTime}px 'Fredoka', sans-serif`;
   ctx.fillStyle = '#1a1a2e';
-  ctx.fillText(fullText, textX, textY);
+  ctx.fillText(timeLine, centerX, curY + timeLineH / 2);
+  curY += timeLineH;
 
-  // --- Custom Crown Logo Indicator ---
-  const cx = bannerX + 18;
-  const cy = bannerY + bannerHeight / 2 - 2;
-  const scale = fontSize * 0.035;
+  // Address block
+  if (addrLines.length > 0) {
+    // Separator line
+    curY += separatorH * 0.35;
+    ctx.fillStyle = 'rgba(26, 26, 46, 0.3)';
+    const sepW = bannerWidth * 0.55;
+    roundRect(ctx, centerX - sepW / 2, curY, sepW, 3, 2);
+    ctx.fill();
+    curY += separatorH * 0.65;
 
-  ctx.translate(cx, cy);
-  ctx.scale(scale, scale);
-  
-  ctx.fillStyle = '#1a1a2e';
-  ctx.beginPath();
-  ctx.moveTo(12, 12);
-  ctx.lineTo(-12, 12);
-  ctx.lineTo(-14, -6);
-  ctx.lineTo(-4, 0);
-  ctx.lineTo(0, -12);
-  ctx.lineTo(4, 0);
-  ctx.lineTo(14, -6);
-  ctx.closePath();
-  ctx.fill();
+    ctx.font = `700 ${fAddr}px 'Fredoka', sans-serif`;
+    ctx.fillStyle = 'rgba(26, 26, 46, 0.75)';
+    addrLines.forEach(line => {
+      ctx.fillText(line, centerX, curY + addrLineH / 2);
+      curY += addrLineH;
+    });
+  }
 
-  ctx.beginPath();
-  ctx.arc(-14, -6, 2.5, 0, Math.PI * 2);
-  ctx.arc(0, -12, 2.5, 0, Math.PI * 2);
-  ctx.arc(14, -6, 2.5, 0, Math.PI * 2);
-  ctx.fill();
-  
+  ctx.textAlign = 'left'; // Reset
   ctx.restore();
 };
 
@@ -1507,8 +1739,8 @@ const roundRect = (ctx, x, y, w, h, r) => {
 
 const retakePhoto = () => {
   capturedPhotoDataUrl = null;
-  const preview = $('cameraPreviewWrap');
-  if (preview) preview.classList.add('hidden');
+  const doneWrap = $('cameraDoneWrap');
+  if (doneWrap) doneWrap.classList.add('hidden');
   // Reopen camera
   toggleCamera();
 };
@@ -1516,8 +1748,8 @@ const retakePhoto = () => {
 const resetCameraUI = () => {
   stopCameraStream();
   capturedPhotoDataUrl = null;
-  const preview = $('cameraPreviewWrap');
-  if (preview) preview.classList.add('hidden');
+  const doneWrap = $('cameraDoneWrap');
+  if (doneWrap) doneWrap.classList.add('hidden');
 };
 
 // ===== THEME TOGGLE =====
@@ -1639,13 +1871,18 @@ const handleLogin = (e) => {
     'kanjeng putri': '120900'
   };
   
-  if (accounts[username] && accounts[username] === password) {
+  const customPasswords = JSON.parse(localStorage.getItem('nk_customPasswords') || '{}');
+  const expectedPassword = customPasswords[username] || accounts[username];
+  
+  if (expectedPassword && expectedPassword === password) {
     playSound('coin');
     
     if (rememberMe) {
       localStorage.setItem('nk_loggedIn', 'true');
+      localStorage.setItem('nk_loggedInUser', username);
     } else {
       sessionStorage.setItem('nk_loggedIn', 'true');
+      sessionStorage.setItem('nk_loggedInUser', username);
     }
     
     const loginScreen = $('loginScreen');
@@ -1686,6 +1923,8 @@ const logout = () => {
   playSound('pop');
   sessionStorage.removeItem('nk_loggedIn');
   localStorage.removeItem('nk_loggedIn');
+  sessionStorage.removeItem('nk_loggedInUser');
+  localStorage.removeItem('nk_loggedInUser');
   
   const appContainer = $('appContainer');
   const loginScreen = $('loginScreen');
@@ -1697,13 +1936,138 @@ const logout = () => {
   showToast('Behasil keluar dari Gerbang Utama');
 };
 
+let newProfilePhotoDataUrl = null;
+
+const applyProfileData = () => {
+  const savedPhoto = localStorage.getItem('nk_profilePhoto');
+  const profileBtn = $('profileBtn');
+  if (savedPhoto && profileBtn) {
+    profileBtn.style.backgroundImage = `url(${savedPhoto})`;
+    profileBtn.style.backgroundSize = 'cover';
+    profileBtn.style.backgroundPosition = 'center';
+    const svg = profileBtn.querySelector('svg');
+    if (svg) svg.style.display = 'none';
+  } else if (profileBtn) {
+    profileBtn.style.backgroundImage = 'none';
+    const svg = profileBtn.querySelector('svg');
+    if (svg) svg.style.display = 'block';
+  }
+};
+
 if ($('profileBtn')) {
   $('profileBtn').addEventListener('click', () => {
-    if (confirm('Apakah Anda yakin ingin Logout?')) {
-      logout();
+    playSound('pop');
+    const savedPhoto = localStorage.getItem('nk_profilePhoto');
+    const profileImg = $('profilePhotoImg');
+    
+    if (savedPhoto && profileImg) {
+      profileImg.src = savedPhoto;
+    } else if (profileImg) {
+      profileImg.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%231a1a2e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2'/%3E%3Ccircle cx='12' cy='7' r='4'/%3E%3C/svg%3E";
     }
+    $('profileNewPassword').value = '';
+    const loggedInUser = sessionStorage.getItem('nk_loggedInUser') || localStorage.getItem('nk_loggedInUser') || 'Sistem';
+    if ($('profileNameDisplay')) {
+      $('profileNameDisplay').textContent = loggedInUser;
+    }
+    
+    newProfilePhotoDataUrl = null;
+    openModal('profileModal');
   });
 }
+
+const handleProfilePhoto = (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = (event) => {
+    newProfilePhotoDataUrl = event.target.result;
+    $('profilePhotoImg').src = newProfilePhotoDataUrl;
+    playSound('pop');
+  };
+  reader.readAsDataURL(file);
+  e.target.value = ''; 
+};
+
+const saveProfile = () => {
+  playSound('pop');
+  const newPass = $('profileNewPassword').value.trim();
+  const loggedInUser = sessionStorage.getItem('nk_loggedInUser') || localStorage.getItem('nk_loggedInUser');
+  
+  if (newProfilePhotoDataUrl) {
+    localStorage.setItem('nk_profilePhoto', newProfilePhotoDataUrl);
+  }
+  
+  if (newPass && loggedInUser) {
+    const overrides = JSON.parse(localStorage.getItem('nk_customPasswords') || '{}');
+    overrides[loggedInUser] = newPass;
+    localStorage.setItem('nk_customPasswords', JSON.stringify(overrides));
+  }
+  
+  applyProfileData();
+  closeModal('profileModal');
+  showToast('Pengaturan profil disimpan');
+};
+
+const toggleNotebookBook = () => {
+    const container = document.getElementById('mainNotebookContainer');
+    if (container) {
+        if (container.classList.contains('is-open')) {
+            container.classList.remove('is-open');
+            document.querySelectorAll('.notebook-tab').forEach(t => t.classList.remove('active'));
+        } else {
+            container.classList.add('is-open');
+            let activeFound = false;
+            document.querySelectorAll('.notebook-page').forEach(p => {
+                if (p.classList.contains('active') || p.style.display === 'block') {
+                    const pageId = p.id.replace('page-', '');
+                    const btn = document.getElementById(`tabBtn-${pageId}`);
+                    if (btn) btn.classList.add('active');
+                    activeFound = true;
+                }
+            });
+            if (!activeFound) switchNotebookTab('expense');
+        }
+    }
+};
+
+let sideChartIndex = 0;
+
+const updateSideChartIndicators = () => {
+  const indicators = document.querySelectorAll('#sideChartIndicators .indicator');
+  indicators.forEach((ind, i) => {
+    if (i === sideChartIndex) ind.classList.add('active');
+    else ind.classList.remove('active');
+  });
+};
+
+const flipSideChart = () => {
+  const slides = document.querySelectorAll('.side-chart-slide');
+  if (slides.length === 0) return;
+  slides[sideChartIndex].classList.remove('active');
+  slides[sideChartIndex].style.display = 'none';
+  
+  sideChartIndex = (sideChartIndex + 1) % slides.length;
+  
+  slides[sideChartIndex].classList.add('active');
+  slides[sideChartIndex].style.display = 'block';
+  updateSideChartIndicators();
+};
+
+const goToSideChartSlide = (index) => {
+  const slides = document.querySelectorAll('.side-chart-slide');
+  if (!slides[index] || index === sideChartIndex) return;
+  
+  slides[sideChartIndex].classList.remove('active');
+  slides[sideChartIndex].style.display = 'none';
+  
+  sideChartIndex = index;
+  
+  slides[sideChartIndex].classList.add('active');
+  slides[sideChartIndex].style.display = 'block';
+  updateSideChartIndicators();
+};
 
 // ===== INITIALIZATION =====
 const init = () => {
@@ -1712,6 +2076,7 @@ const init = () => {
   populateDropdowns();
   initCharts();
   recalculate();
+  applyProfileData();
 
   // Set initial KPI values without animation
   kpiOperasional.dataset.currentValue = getOperasionalBalance();
@@ -1720,6 +2085,18 @@ const init = () => {
   kpiSisaSaldo.dataset.currentValue = getOperasionalBalance() + getTotalTabungan();
 
   checkAuth();
+  
+  // Format Inputs
+  ['expAmount', 'incAmount', 'trfAmount'].forEach(id => {
+    const el = $(id);
+    if (el) {
+      el.type = 'text';
+      el.addEventListener('input', formatNominalInput);
+    }
+  });
+
+  // Start side-chart slide
+  setInterval(flipSideChart, 5000);
 };
 
 init();
