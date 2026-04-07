@@ -43,11 +43,25 @@ const sfx = {
   // Clean UI variants: Soft pop, clear chime for success, modern blip for error
   pop: new Audio('https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3'),
   coin: new Audio('https://assets.mixkit.co/active_storage/sfx/2000/2000-preview.mp3'),
-  error: new Audio('https://assets.mixkit.co/active_storage/sfx/2572/2572-preview.mp3')
+  error: new Audio('https://assets.mixkit.co/active_storage/sfx/2572/2572-preview.mp3'),
+  pageFlip: new Audio('https://www.soundjay.com/misc/sounds/page-flip-01a.mp3'),
+  shutter: new Audio('https://www.soundjay.com/mechanical/sounds/camera-shutter-click-01.mp3'),
+  magic: new Audio('https://www.soundjay.com/misc/sounds/magic-chime-01.mp3'),
+  swoosh: new Audio('https://www.soundjay.com/misc/sounds/wind-swoosh-01.mp3'),
+  boing: new Audio('https://www.soundjay.com/button/sounds/button-3.mp3'),
+  sword: new Audio('https://www.soundjay.com/mechanical/sounds/scissors-cutting-2.mp3'),
+  drawer: new Audio('https://www.soundjay.com/misc/sounds/wood-crack-1.mp3')
 };
 sfx.pop.volume = 0.5;
 sfx.coin.volume = 0.6;
 sfx.error.volume = 0.5;
+sfx.pageFlip.volume = 0.7;
+sfx.shutter.volume = 0.6;
+sfx.magic.volume = 0.5;
+sfx.swoosh.volume = 0.3;
+sfx.boing.volume = 0.4;
+sfx.sword.volume = 0.7;
+sfx.drawer.volume = 0.6;
 
 let pendingPop = null;
 
@@ -88,8 +102,16 @@ document.addEventListener('focusin', (e) => {
 
 // Global Listener: Segala klik
 document.addEventListener('click', (e) => {
-  if (e.target.closest('button, .notebook-tab, .modal-close, .slide-nav-btn, .theme-toggle')) {
-    playSound('pop');
+  if (e.target.closest('.notebook-tab')) {
+    playSound('pageFlip');
+  } else if (e.target.closest('.theme-toggle')) {
+    playSound('boing');
+  } else if (e.target.closest('button, .modal-close, .slide-nav-btn')) {
+    if (e.target.closest('.btn-shutter')) {
+      playSound('shutter');
+    } else {
+      playSound('pop');
+    }
   }
 });
 
@@ -491,9 +513,11 @@ const populateDropdowns = () => {
 
   expSource.innerHTML = sourceOpts;
 
-  // Income goal dropdown
+  // Income goal dropdown — always include a placeholder so "+ Tambahkan" can trigger change
+  const goalOpts = state.goals.map((g) => `<option value="${g.id}">${escHtml(g.name)}</option>`);
   incGoal.innerHTML = [
-    ...state.goals.map((g) => `<option value="${g.id}">${escHtml(g.name)}</option>`),
+    '<option value="" disabled selected>— Pilih tabungan —</option>',
+    ...goalOpts,
     '<option value="__manage_goal__" class="manage-opt">+ Tambahkan</option>'
   ].join('');
 
@@ -503,27 +527,29 @@ const populateDropdowns = () => {
 };
 
 // Bind dropdown "Kelola" / "+ Tambahkan" options
-[expCategory].forEach(el => {
-  if (el) {
-    el.addEventListener('change', function() {
-      if (this.value === '__manage_category__') {
-        this.selectedIndex = 0; // reset
-        openModal('categoryModal');
-      }
-    });
-  }
-});
+const bindManageOption = (el, manageValue, modalId) => {
+  if (!el) return;
+  // Primary: change event
+  el.addEventListener('change', function() {
+    if (this.value === manageValue) {
+      this.selectedIndex = 0;
+      openModal(modalId);
+    }
+  });
+  // Fallback: click event for when the manage option is already selected
+  el.addEventListener('click', function() {
+    if (this.value === manageValue) {
+      this.selectedIndex = 0;
+      openModal(modalId);
+    }
+  });
+};
 
-[expSource, incGoal, trfFrom, trfTo].forEach(el => {
-  if (el) {
-    el.addEventListener('change', function() {
-      if (this.value === '__manage_goal__') {
-        this.selectedIndex = 0; // reset
-        openModal('goalsModal');
-      }
-    });
-  }
-});
+bindManageOption(expCategory, '__manage_category__', 'categoryModal');
+bindManageOption(expSource, '__manage_goal__', 'goalsModal');
+bindManageOption(incGoal, '__manage_goal__', 'goalsModal');
+bindManageOption(trfFrom, '__manage_goal__', 'goalsModal');
+bindManageOption(trfTo, '__manage_goal__', 'goalsModal');
 
 
 // Show/hide goal sub-select on income destination change
@@ -716,7 +742,7 @@ const submitIncome = () => {
   incDesc.value = '';
   saveState();
   recalculate();
-  playSound('coin');
+  playSound('magic');
   showToast(`Pemasukan ${formatRp(amount)} tercatat`);
   
   if (dest !== 'operasional') {
@@ -778,11 +804,11 @@ const getAccountLabel = (id) => {
 
 // ===== CHARTS =====
 const getChartFontColor = () => {
-  return state.theme === 'dark' ? '#a8a8c4' : '#55556a';
+  return state.theme === 'dark' ? '#ffffff' : '#1a1a2e';
 };
 
 const getChartGridColor = () => {
-  return state.theme === 'dark' ? 'rgba(100,100,140,0.3)' : 'rgba(50,50,80,0.1)';
+  return state.theme === 'dark' ? 'rgba(255,255,255,0.4)' : 'rgba(26,26,46,0.15)';
 };
 
 const initCharts = () => {
@@ -1038,26 +1064,30 @@ const updateCharts = () => {
   lineChartInst.options.plugins.tooltip.backgroundColor = tooltipBg;
   lineChartInst.update();
 
-  // === Radar: Dynamic Wealth Distribution ===
+  // === Radar: Kesehatan Tabungan (Wealth Distribution) ===
   if (radarChartInst) {
     const radarLabels = [];
     const radarData = [];
 
-    // 1. Tabungan Goals
+    // 1. Operasional balance
+    const opBal = Math.max(0, getOperasionalBalance());
+    radarLabels.push('Operasional');
+    radarData.push(opBal);
+
+    // 2. Each savings goal (actual balance)
     state.goals.forEach(g => {
       radarLabels.push(g.name);
-      radarData.push(g.target > 0 ? g.target : getGoalBalance(g.id)); // Assuming their balance
+      radarData.push(Math.max(0, getGoalBalance(g.id)));
     });
 
-    // 2. Operasional
-    radarLabels.push('Operasional');
-    radarData.push(getOperasionalBalance());
-
-    // 3. Categories (Expenses)
-    state.categories.forEach(c => {
-      radarLabels.push(c);
-      radarData.push(catMap[c] || 0); // Using catMap calculated above
-    });
+    // 3. Ensure minimum 3 data points for a proper polygon
+    // Hanya gunakan tabungan, tambahkan titik kosong agar tidak merusak bentuk grafik!
+    let spaces = ' ';
+    while (radarLabels.length < 3) {
+      radarLabels.push(spaces);
+      radarData.push(0);
+      spaces += ' ';
+    }
 
     radarChartInst.data.labels = radarLabels;
     radarChartInst.data.datasets[0].data = radarData;
@@ -1437,7 +1467,7 @@ const capturePhotoFullscreen = () => {
     void videoWrap.offsetWidth; 
     videoWrap.classList.add('flash');
   }
-  playSound('coin');
+  playSound('shutter');
 
   const vw = video.videoWidth;
   const vh = video.videoHeight;
@@ -2011,6 +2041,7 @@ const saveProfile = () => {
 };
 
 const toggleNotebookBook = () => {
+    playSound('swoosh');
     const container = document.getElementById('mainNotebookContainer');
     if (container) {
         if (container.classList.contains('is-open')) {
@@ -2096,7 +2127,179 @@ const init = () => {
   });
 
   // Start side-chart slide
-  setInterval(flipSideChart, 5000);
+  setInterval(flipSideChart, 15000);
+};
+
+// ===== SPA ROUTING =====
+const navigatePage = (pageId) => {
+  playSound('pageFlip');
+  
+  // Update navs
+  document.querySelectorAll('.nav-link').forEach(link => {
+    link.classList.remove('active');
+    if(link.dataset.page === pageId) link.classList.add('active');
+  });
+
+  // Toggle sections
+  document.querySelectorAll('.page-view').forEach(page => {
+    page.style.display = 'none';
+    page.classList.remove('active');
+  });
+
+  const activePage = $('page' + pageId.charAt(0).toUpperCase() + pageId.slice(1));
+  if(activePage) {
+    activePage.style.display = 'block';
+    setTimeout(() => activePage.classList.add('active'), 50);
+  }
+
+  // Trigger page specific renders
+  if(pageId === 'ledger') {
+    renderLedger();
+  }
+};
+
+// ===== LEDGER LOGIC =====
+const renderLedger = () => {
+  const tbody = $('ledgerTableBody');
+  const emptyEl = $('ledgerEmpty');
+  if(!tbody || !emptyEl) return;
+
+  const startDate = $('filterStartDate').value;
+  const endDate = $('filterEndDate').value;
+  const typeFilter = $('filterType').value;
+  const searchInput = $('filterSearch') ? $('filterSearch').value.toLowerCase().trim() : '';
+
+  let filtered = [...state.transactions].sort((a,b) => new Date(b.date) - new Date(a.date));
+  
+  // Date filter logic
+  if (startDate) {
+    const sDate = new Date(startDate);
+    sDate.setHours(0,0,0,0);
+    filtered = filtered.filter(tx => new Date(tx.date) >= sDate);
+  }
+  if (endDate) {
+    const eDate = new Date(endDate);
+    eDate.setHours(23,59,59,999);
+    filtered = filtered.filter(tx => new Date(tx.date) <= eDate);
+  }
+
+  // Type filter logic
+  if (typeFilter !== 'all') {
+    filtered = filtered.filter(tx => tx.type === typeFilter);
+  }
+  
+  // Text search filtering logic
+  if (searchInput) {
+    filtered = filtered.filter(tx => (tx.description || '').toLowerCase().includes(searchInput));
+  }
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = '';
+    emptyEl.classList.remove('hidden');
+    return;
+  }
+  
+  emptyEl.classList.add('hidden');
+  
+  tbody.innerHTML = filtered.map(tx => {
+    const isIncome = tx.type === 'income';
+    const isExpense = tx.type === 'expense';
+    
+    // Label
+    let stampText = 'UNKNOWN';
+    let stampColor = '';
+    if (isIncome) { stampText = 'Pemasukan'; stampColor = 'income'; }
+    if (isExpense) { stampText = 'Pengeluaran'; stampColor = 'expense'; }
+    if (!isIncome && !isExpense) { stampText = 'Transfer'; stampColor = 'transfer'; }
+    
+    const displayDate = new Date(tx.date).toLocaleDateString('id-ID', {
+      year: 'numeric', month: 'short', day: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    });
+
+    return `
+      <tr class="ledger-row" id="tx_row_${tx.id}">
+        <td>
+          <div style="font-size: 0.9em; font-weight: 800; color: var(--text-primary);">${displayDate}</div>
+        </td>
+        <td style="max-width: 200px;">
+          <div style="font-weight: 800; color: var(--text-primary);">${escHtml(tx.description || '-')}</div>
+        </td>
+        <td>
+          <span class="table-badge ${stampColor}">${stampText}</span>
+        </td>
+        <td>
+          <div style="font-weight: 800; color: var(--text-primary); text-transform: capitalize;">${isIncome ? 'Eksternal' : escHtml(tx.source || '-')}</div>
+        </td>
+        <td>
+          <span class="table-amount ${stampColor}">${formatRp(tx.amount)}</span>
+        </td>
+        <td style="text-align: center;">
+          ${tx.photo ? `
+            <button class="btn-icon-sq btn-view" onclick="viewPhoto('${tx.id}')" aria-label="Lihat Bukti" title="Lihat Bukti">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            </button>
+          ` : ''}
+        </td>
+        <td style="text-align: center;">
+          <button class="btn-icon-sq btn-delete" onclick="deleteLedgerRow('${tx.id}', this)" aria-label="Hapus" title="Hapus">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+};
+
+const viewPhoto = (txId) => {
+    playSound('pop');
+    const tx = state.transactions.find(t => t.id === txId);
+    if (tx && tx.photo) {
+        const viewerImg = $('viewerPhotoImg');
+        const btnDownload = $('btnDownloadViewer');
+        
+        viewerImg.src = tx.photo;
+        
+        btnDownload.onclick = () => {
+             const a = document.createElement('a');
+             a.href = tx.photo;
+             a.download = `bukti_${tx.id}.jpg`;
+             document.body.appendChild(a);
+             a.click();
+             document.body.removeChild(a);
+             playSound('coin');
+             showToast('Foto berhasil diunduh!');
+        };
+        
+        openModal('photoViewerModal');
+    } else {
+        showToast('Foto tidak tersedia.', 'error');
+    }
+};
+
+const deleteLedgerRow = (txId, btnEl) => {
+  playSound('pop');
+  
+  $('confirmModalText').textContent = 'Hapus transaksi ini permanen?';
+  
+  const confirmBtn = $('btnConfirmAction');
+  confirmBtn.onclick = () => {
+    closeModal('confirmModal');
+    
+    const row = btnEl.closest('tr');
+    if (row) row.classList.add('row-delete-anim');
+    
+    setTimeout(() => {
+      state.transactions = state.transactions.filter(t => t.id !== txId);
+      saveState();
+      recalculate();
+      renderLedger();
+      showToast('Transaksi berhasil dihapus.', 'success');
+    }, 300); 
+  };
+  
+  openModal('confirmModal');
 };
 
 init();
+

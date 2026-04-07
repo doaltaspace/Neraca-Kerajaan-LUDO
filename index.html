@@ -115,9 +115,9 @@
                     </a>
 
                     <div class="nav-links" id="navLinks">
-                        <a href="#" class="nav-link active" data-page="dashboard">Dashboard</a>
-                        <a href="#" class="nav-link disabled" data-page="ledger">Buku Besar</a>
-                        <a href="#" class="nav-link disabled" data-page="goals">Tujuan</a>
+                        <a href="#" class="nav-link active" data-page="dashboard" onclick="navigatePage('dashboard')">Dashboard</a>
+                        <a href="#" class="nav-link" data-page="ledger" onclick="navigatePage('ledger')">Buku Kas</a>
+                        <a href="#" class="nav-link" data-page="goals" onclick="navigatePage('goals')">Tujuan</a>
                     </div>
                 </div>
 
@@ -164,7 +164,7 @@
         </nav>
 
         <!-- ========== DASHBOARD ========== -->
-        <main class="dashboard">
+        <main class="dashboard page-view active" id="pageDashboard">
             <div class="container">
 
                 <!-- ===== KPI CARDS ===== -->
@@ -565,7 +565,7 @@
                                     </div>
 
                                     <div class="carousel-indicators" id="sideChartIndicators"
-                                        style="margin-top: 32px; margin-bottom: 0;">
+                                        style="position: relative; left: 0; bottom: 0; transform: none; width: 100%; justify-content: center; margin-top: 24px; padding-bottom: 16px;">
                                         <span class="indicator active" onclick="goToSideChartSlide(0)"></span>
                                         <span class="indicator" onclick="goToSideChartSlide(1)"></span>
                                     </div>
@@ -577,7 +577,7 @@
                 </div>
 
                 <!-- ===== CHARTS ===== -->
-                <section class="dashboard-section" id="chartsSection">
+                <section class="dashboard-section" id="chartsSection" style="margin-top: 48px;">
                     <div class="section-title">
                         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
                             stroke-linecap="round" stroke-linejoin="round">
@@ -667,6 +667,85 @@
             </div>
         </main>
 
+        <!-- ========== BUKU KAS (LEDGER) ========== -->
+        <main class="ledger page-view" id="pageLedger" style="display:none;">
+            <div class="container">
+                <div class="scroll-wrapper" style="margin-top: 40px; max-width: 1000px; margin-left: auto; margin-right: auto;">
+                    <div class="cabinet-header" style="margin-bottom: -6px; position: relative; z-index: 10;">
+                        <svg viewBox="0 0 24 24" fill="none" class="icon" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+                        </svg>
+                        <h2>ARSIP BUKU KAS</h2>
+                    </div>
+
+                    <div class="scroll-top-end"></div>
+                    <div class="ledger-scroll-container" id="ledgerScrollContainer" onscroll="handleLedgerScroll()">
+                    
+                        <!-- Modern Filter Bar -->
+                        <div class="ledger-filter-bar">
+                            <div class="filter-group">
+                                <label>Mulai</label>
+                                <input type="date" id="filterStartDate" onchange="renderLedger()">
+                            </div>
+                            <div class="filter-group">
+                                <label>Sampai</label>
+                                <input type="date" id="filterEndDate" onchange="renderLedger()">
+                            </div>
+                            <div class="filter-group">
+                                <label>Tipe</label>
+                                <select id="filterType" onchange="renderLedger()">
+                                    <option value="all">Semua Tipe</option>
+                                    <option value="income">Pemasukan</option>
+                                    <option value="expense">Pengeluaran</option>
+                                    <option value="transfer">Transfer</option>
+                                </select>
+                            </div>
+                            <div class="filter-group" style="flex: 2;">
+                                <label>Pencarian</label>
+                                <input type="text" id="filterSearch" placeholder="Cari keterangan..." oninput="renderLedger()">
+                            </div>
+                        </div>
+
+                        <!-- Ludo Table -->
+                        <div class="table-responsive">
+                            <table class="ludo-table">
+                                <thead style="border-radius: 12px 12px 0 0;">
+                                    <tr>
+                                        <th>Tanggal & Waktu</th>
+                                        <th>Keterangan</th>
+                                        <th>Status</th>
+                                        <th>Dari</th>
+                                        <th>Nominal</th>
+                                        <th style="text-align: center;">Bukti</th>
+                                        <th style="text-align: center;">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="ledgerTableBody">
+                                    <!-- Data diisi via JS -->
+                                </tbody>
+                            </table>
+                            <div class="empty-state hidden" id="ledgerEmpty">
+                                <span style="font-size: 3rem;">🕸️</span>
+                                <p>Tidak ada catatan yang ditemukan.</p>
+                            </div>
+                        </div>
+
+                    </div>
+                    <div class="scroll-bottom-end"></div>
+                </div>
+            </div>
+        </main>
+
+        <!-- ========== TUJUAN (GOALS) ========== -->
+        <main class="goals page-view" id="pageGoals" style="display:none;">
+            <div class="container">
+                <div class="goals-wrapper" style="padding-top: 100px; text-align:center;">
+                    <h2 style="font-size: 2rem; color: #1a1a2e;">🏗️ Tujuan Kerajaan</h2>
+                    <p style="color: var(--text-secondary); margin-top: 20px;">Halaman ini akan dirombak dan dibangun pada fase berikutnya.</p>
+                </div>
+            </div>
+        </main>
+
     </div> <!-- End of appContainer -->
 
     <!-- ========== MODAL: Kelola Kategori Pengeluaran ========== -->
@@ -695,6 +774,16 @@
                 <button class="modal-close" onclick="closeModal('goalsModal')">x</button>
             </div>
             <div class="item-list" id="goalsList"></div>
+            <div class="modal-add-row" style="flex-direction: column; gap: 8px;">
+                <div style="display: flex; gap: 8px; width: 100%;">
+                    <input type="text" class="form-input" id="newGoalName" placeholder="Nama tabungan baru" style="flex: 1">
+                    <div class="form-input-with-prefix" style="flex: 1;">
+                        <span class="form-prefix">Rp</span>
+                        <input type="number" class="form-input" id="newGoalTarget" placeholder="Target (opsional)" min="0">
+                    </div>
+                </div>
+                <button class="btn btn-sm btn-amber" onclick="addGoal()" style="width: 100%;">Tambah Tujuan</button>
+            </div>
         </div>
     </div>
 
@@ -771,6 +860,46 @@
                     </svg>
                     Keluar (Logout)
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========== MODAL: View Photo Bukti ========== -->
+    <div class="modal-overlay" id="photoViewerModal">
+        <div class="modal-backdrop" onclick="closeModal('photoViewerModal')"></div>
+        <div class="modal-content" style="max-width: 500px; padding: 20px; text-align: center;">
+            <div class="modal-header">
+                <span class="modal-title">Foto Bukti Transaksi</span>
+                <button class="modal-close" onclick="closeModal('photoViewerModal')">x</button>
+            </div>
+            <div style="margin-top: 15px; border-radius: 12px; overflow: hidden; border: 4px solid var(--border-dark); box-shadow: 4px 4px 0 var(--border-dark); background: var(--bg-card); display: inline-block;">
+                <img id="viewerPhotoImg" src="" alt="Foto Bukti" style="max-width: 100%; max-height: 70vh; display: block; object-fit: contain;">
+            </div>
+            <div style="margin-top: 15px; display: flex; gap: 10px; justify-content: center;">
+                 <button class="btn btn-blue" id="btnDownloadViewer" style="flex: 1;">
+                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                     Unduh Foto
+                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========== MODAL: Confirmation ========== -->
+    <div class="modal-overlay" id="confirmModal">
+        <div class="modal-backdrop" onclick="closeModal('confirmModal')"></div>
+        <div class="modal-content" style="max-width: 400px; padding: 24px; text-align: center;">
+            <div style="margin-bottom: 16px;">
+                <svg viewBox="0 0 24 24" fill="none" class="icon" stroke="#f44336" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width: 48px; height: 48px;">
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="12" y1="8" x2="12" y2="12" />
+                    <line x1="12" y1="16" x2="12.01" y2="16" />
+                </svg>
+            </div>
+            <h3 style="font-size: 1.3rem; margin-bottom: 12px; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 900;">Konfirmasi Tindakan</h3>
+            <p id="confirmModalText" style="font-size: 1rem; color: var(--text-secondary); margin-bottom: 24px; font-weight: 600;">Apakah Anda yakin?</p>
+            <div style="display: flex; gap: 12px; justify-content: center;">
+                <button class="btn btn-sm btn-red" id="btnConfirmCancel" onclick="closeModal('confirmModal')" style="flex: 1; background: #fecaca; color: #1a1a2e;">Batal</button>
+                <button class="btn btn-sm btn-red" id="btnConfirmAction" style="flex: 1;">Ya, Lanjutkan</button>
             </div>
         </div>
     </div>
