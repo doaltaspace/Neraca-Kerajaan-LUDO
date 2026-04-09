@@ -1156,9 +1156,36 @@ const escHtml = (str) => {
 const hamburger = $('hamburger');
 const navLinks = $('navLinks');
 
-if (hamburger) {
-  hamburger.addEventListener('click', () => {
-    navLinks.classList.toggle('mobile-open');
+const closeMobileMenu = () => {
+  if (!navLinks) return;
+  navLinks.classList.remove('mobile-open');
+  if (hamburger) hamburger.setAttribute('aria-expanded', 'false');
+};
+
+if (hamburger && navLinks) {
+  hamburger.setAttribute('aria-expanded', 'false');
+
+  hamburger.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const isOpen = navLinks.classList.toggle('mobile-open');
+    hamburger.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+  });
+
+  navLinks.addEventListener('click', (e) => {
+    if (e.target.closest('.nav-link')) {
+      closeMobileMenu();
+    }
+  });
+
+  document.addEventListener('click', (e) => {
+    if (window.innerWidth > 768) return;
+    if (!navLinks.classList.contains('mobile-open')) return;
+    if (e.target.closest('#hamburger') || e.target.closest('#navLinks')) return;
+    closeMobileMenu();
+  });
+
+  window.addEventListener('resize', () => {
+    if (window.innerWidth > 768) closeMobileMenu();
   });
 }
 
@@ -2133,6 +2160,7 @@ const init = () => {
 // ===== SPA ROUTING =====
 const navigatePage = (pageId) => {
   playSound('pageFlip');
+  closeMobileMenu();
   
   // Update navs
   document.querySelectorAll('.nav-link').forEach(link => {
@@ -2158,97 +2186,415 @@ const navigatePage = (pageId) => {
   }
 };
 
-// ===== LEDGER LOGIC =====
-const renderLedger = () => {
-  const tbody = $('ledgerTableBody');
-  const emptyEl = $('ledgerEmpty');
-  if(!tbody || !emptyEl) return;
+// ===== LEDGER LOGIC (V2 — Card Based) =====
+let ledgerCurrentPage = 1;
+const LEDGER_PER_PAGE = 5;
+let ledgerPeriodMode = '30days'; // '30days' | 'all' | 'custom'
+const ledgerTypeOptions = ['all', 'income', 'expense', 'transfer'];
+const ledgerTypeLabels = { all: 'Semua Tipe', income: 'Pemasukan', expense: 'Pengeluaran', transfer: 'Transfer' };
+let ledgerTypeIndex = 0;
+let ledgerSortColumn = 'date'; // 'date' | 'amount' | 'category' | 'description'
+let ledgerSortDir = 'desc';    // 'asc' | 'desc'
 
-  const startDate = $('filterStartDate').value;
-  const endDate = $('filterEndDate').value;
+const toggleLedgerSort = (column) => {
+  playSound('pop');
+  if (ledgerSortColumn === column) {
+    ledgerSortDir = ledgerSortDir === 'desc' ? 'asc' : 'desc';
+  } else {
+    ledgerSortColumn = column;
+    ledgerSortDir = column === 'amount' ? 'desc' : 'asc';
+  }
+  updateSortIndicators();
+  ledgerCurrentPage = 1;
+  renderLedger();
+};
+
+const updateSortIndicators = () => {
+  document.querySelectorAll('.ledger-v2-col-headers .col-sortable').forEach(el => {
+    el.classList.remove('sort-asc', 'sort-desc');
+    if (el.dataset.sort === ledgerSortColumn) {
+      el.classList.add(ledgerSortDir === 'asc' ? 'sort-asc' : 'sort-desc');
+    }
+  });
+};
+
+// Filter UI Helpers
+const toggleLedgerPeriodFilter = () => {
+  playSound('pop');
+  const dateRangeEl = $('ledgerDateRange');
+  const pillEl = $('filterPillPeriod');
+  const textEl = $('filterPeriodText');
+  
+  if (ledgerPeriodMode === '30days') {
+    ledgerPeriodMode = 'all';
+    textEl.textContent = 'Semua Waktu';
+    pillEl.classList.remove('active');
+    dateRangeEl.classList.add('hidden');
+    $('filterStartDate').value = '';
+    $('filterEndDate').value = '';
+  } else if (ledgerPeriodMode === 'all') {
+    ledgerPeriodMode = 'custom';
+    textEl.textContent = 'Kustom';
+    pillEl.classList.add('active');
+    dateRangeEl.classList.remove('hidden');
+  } else if (ledgerPeriodMode === 'custom') {
+    ledgerPeriodMode = '7days';
+    textEl.textContent = '7 Hari Terakhir';
+    pillEl.classList.add('active');
+    dateRangeEl.classList.add('hidden');
+    $('filterStartDate').value = '';
+    $('filterEndDate').value = '';
+  } else if (ledgerPeriodMode === '7days') {
+    ledgerPeriodMode = '14days';
+    textEl.textContent = '14 Hari Terakhir';
+  } else {
+    ledgerPeriodMode = '30days';
+    textEl.textContent = '30 Hari Terakhir';
+  }
+  ledgerCurrentPage = 1;
+  renderLedger();
+};
+
+const cycleLedgerTypeFilter = () => {
+  playSound('pop');
+  ledgerTypeIndex = (ledgerTypeIndex + 1) % ledgerTypeOptions.length;
+  const val = ledgerTypeOptions[ledgerTypeIndex];
+  $('filterType').value = val;
+  $('filterTypeText').textContent = ledgerTypeLabels[val];
+  const pillEl = $('filterPillType');
+  pillEl.classList.remove('filter-income', 'filter-expense', 'filter-transfer');
+  pillEl.classList.add('active');
+  if (val !== 'all') {
+    pillEl.classList.add(`filter-${val}`);
+  }
+  ledgerCurrentPage = 1;
+  renderLedger();
+};
+
+const toggleLedgerSearchBar = () => {
+  playSound('pop');
+  const searchBarEl = $('ledgerSearchBar');
+  const pillEl = $('filterPillSearch');
+  const isHidden = searchBarEl.classList.contains('hidden');
+  searchBarEl.classList.toggle('hidden', !isHidden);
+  pillEl.classList.toggle('filter-search-open', isHidden);
+  if (isHidden) {
+    setTimeout(() => $('filterSearch').focus(), 100);
+  } else {
+    $('filterSearch').value = '';
+    renderLedger();
+  }
+};
+
+const renderLedger = () => {
+  const container = $('ledgerCardsContainer');
+  const emptyEl = $('ledgerEmpty');
+  const paginationEl = $('ledgerPagination');
+  const countEl = $('ledgerTxCount');
+  const totalInEl = $('ledgerTotalIn');
+  const totalOutEl = $('ledgerTotalOut');
+  if(!container || !emptyEl) return;
+
   const typeFilter = $('filterType').value;
   const searchInput = $('filterSearch') ? $('filterSearch').value.toLowerCase().trim() : '';
 
-  let filtered = [...state.transactions].sort((a,b) => new Date(b.date) - new Date(a.date));
+  let filtered = [...state.transactions];
   
-  // Date filter logic
-  if (startDate) {
-    const sDate = new Date(startDate);
-    sDate.setHours(0,0,0,0);
-    filtered = filtered.filter(tx => new Date(tx.date) >= sDate);
-  }
-  if (endDate) {
-    const eDate = new Date(endDate);
-    eDate.setHours(23,59,59,999);
-    filtered = filtered.filter(tx => new Date(tx.date) <= eDate);
+  // Apply column sort
+  filtered.sort((a, b) => {
+    let valA, valB;
+    switch (ledgerSortColumn) {
+      case 'date':
+        valA = new Date(a.date); valB = new Date(b.date);
+        break;
+      case 'amount':
+        valA = Math.abs(a.amount); valB = Math.abs(b.amount);
+        break;
+      case 'category':
+        valA = (a.category || '').toLowerCase(); valB = (b.category || '').toLowerCase();
+        return ledgerSortDir === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+      case 'description':
+        valA = (a.description || '').toLowerCase(); valB = (b.description || '').toLowerCase();
+        return ledgerSortDir === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+      default:
+        valA = new Date(a.date); valB = new Date(b.date);
+    }
+    return ledgerSortDir === 'asc' ? valA - valB : valB - valA;
+  });
+  
+  // Period filter
+  if (ledgerPeriodMode === '30days') {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    thirtyDaysAgo.setHours(0,0,0,0);
+    filtered = filtered.filter(tx => new Date(tx.date) >= thirtyDaysAgo);
+  } else if (ledgerPeriodMode === '14days') {
+    const fourteenDaysAgo = new Date();
+    fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+    fourteenDaysAgo.setHours(0,0,0,0);
+    filtered = filtered.filter(tx => new Date(tx.date) >= fourteenDaysAgo);
+  } else if (ledgerPeriodMode === '7days') {
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    sevenDaysAgo.setHours(0,0,0,0);
+    filtered = filtered.filter(tx => new Date(tx.date) >= sevenDaysAgo);
+  } else if (ledgerPeriodMode === 'custom') {
+    const startDate = $('filterStartDate').value;
+    const endDate = $('filterEndDate').value;
+    if (startDate) {
+      const sDate = new Date(startDate);
+      sDate.setHours(0,0,0,0);
+      filtered = filtered.filter(tx => new Date(tx.date) >= sDate);
+    }
+    if (endDate) {
+      const eDate = new Date(endDate);
+      eDate.setHours(23,59,59,999);
+      filtered = filtered.filter(tx => new Date(tx.date) <= eDate);
+    }
   }
 
-  // Type filter logic
+  // --- NEW LOGIC: Calculate Selisih BEFORE Type & Search filters so it only depends on Rentang Waktu ---
+  let selisihIn = 0, selisihOut = 0;
+  filtered.forEach(tx => {
+    if (tx.type === 'income') selisihIn += tx.amount;
+    else if (tx.type === 'expense') selisihOut += tx.amount;
+  });
+  const netFlow = selisihIn - selisihOut;
+
+  // Type filter
   if (typeFilter !== 'all') {
     filtered = filtered.filter(tx => tx.type === typeFilter);
   }
   
-  // Text search filtering logic
+  // Search filter
   if (searchInput) {
     filtered = filtered.filter(tx => (tx.description || '').toLowerCase().includes(searchInput));
   }
 
-  if (filtered.length === 0) {
-    tbody.innerHTML = '';
+  // Calculate totals for currently visible items
+  let totalIn = 0, totalOut = 0;
+  filtered.forEach(tx => {
+    if (tx.type === 'income') totalIn += tx.amount;
+    else if (tx.type === 'expense') totalOut += tx.amount;
+  });
+  totalInEl.textContent = formatRp(totalIn);
+  totalOutEl.textContent = formatRp(totalOut);
+
+  // Calculate & display net flow
+  const netFlowEl = $('ledgerNetFlow');
+  const netPillEl = $('summaryNetFlow');
+  const netMsgEl = $('ledgerNetFlowMsg');
+  const netMascotEl = $('ledgerNetFlowMascot');
+
+  if (netFlowEl) {
+    const prefix = netFlow > 0 ? '+' : (netFlow < 0 ? '-' : '');
+    netFlowEl.textContent = `${prefix}${formatRp(Math.abs(netFlow))}`;
+  }
+  
+  if (netPillEl && netMsgEl && netMascotEl) {
+    netPillEl.classList.remove('surplus', 'deficit');
+    
+    // Funny phrases and interactive mascots
+    let msg = "";
+    let mascotHtml = "";
+    
+    const svgLaugh = `<svg viewBox="0 0 32 32" width="36" height="36" fill="none" class="mascot-laugh-svg">
+      <path d="M4 24h24v3H4z" fill="#f6a723" rx="1.5" />
+      <path d="M4 24L2 10l8 6 6-10 6 10 8-6-2 14z" fill="#f6a723" opacity="0.85" />
+      <circle cx="8" cy="10.5" r="1.8" fill="#f6a723" />
+      <circle cx="16" cy="5.5" r="1.8" fill="#f6a723" />
+      <circle cx="24" cy="10.5" r="1.8" fill="#f6a723" />
+      <g style="transform-origin: center 15.5px; animation: blink 4s infinite;">
+        <path d="M10 17 Q12 14 14 17" stroke="#1a1a2e" stroke-width="1.8" stroke-linecap="round" fill="none" />
+        <path d="M18 17 Q20 14 22 17" stroke="#1a1a2e" stroke-width="1.8" stroke-linecap="round" fill="none" />
+      </g>
+      <path d="M12 19 Q16 26 20 19 Z" fill="#b91c1c" />
+      <circle cx="9" cy="19" r="2" fill="#fca5a5" opacity="0.8" />
+      <circle cx="23" cy="19" r="2" fill="#fca5a5" opacity="0.8" />
+    </svg>`;
+
+    const svgCry = `<svg viewBox="0 0 32 32" width="36" height="36" fill="none" class="mascot-cry-svg">
+      <path d="M4 24h24v3H4z" fill="#f6a723" rx="1.5" />
+      <path d="M4 24L2 10l8 6 6-10 6 10 8-6-2 14z" fill="#f6a723" opacity="0.85" />
+      <circle cx="8" cy="10.5" r="1.8" fill="#f6a723" />
+      <circle cx="16" cy="5.5" r="1.8" fill="#f6a723" />
+      <circle cx="24" cy="10.5" r="1.8" fill="#f6a723" />
+      <g style="transform-origin: center 15px; animation: blink 4s infinite 1.5s;">
+        <path d="M10 15 Q12 13 14 16" stroke="#1a1a2e" stroke-width="1.8" stroke-linecap="round" fill="none" />
+        <path d="M18 16 Q20 13 22 15" stroke="#1a1a2e" stroke-width="1.8" stroke-linecap="round" fill="none" />
+      </g>
+      <ellipse cx="16" cy="21" rx="2.5" ry="3.5" fill="#1a1a2e" />
+      <circle cx="11" cy="18" r="1.5" fill="#38bdf8" class="tear-anim tear-left" />
+      <circle cx="21" cy="18" r="1.5" fill="#38bdf8" class="tear-anim tear-right" />
+    </svg>`;
+
+    const svgNeutral = `<svg viewBox="0 0 32 32" width="36" height="36" fill="none" class="mascot-neutral-svg">
+      <path d="M4 24h24v3H4z" fill="#f6a723" rx="1.5" />
+      <path d="M4 24L2 10l8 6 6-10 6 10 8-6-2 14z" fill="#f6a723" opacity="0.85" />
+      <circle cx="8" cy="10.5" r="1.8" fill="#f6a723" />
+      <circle cx="16" cy="5.5" r="1.8" fill="#f6a723" />
+      <circle cx="24" cy="10.5" r="1.8" fill="#f6a723" />
+      <g style="transform-origin: center 16px; animation: blink 4s infinite 0.5s;">
+        <ellipse cx="12" cy="16" rx="2.5" ry="3.5" fill="#fff" />
+        <ellipse cx="20" cy="16" rx="2.5" ry="3.5" fill="#fff" />
+        <circle cx="12" cy="16" r="1.2" fill="#1a1a2e" />
+        <circle cx="20" cy="16" r="1.2" fill="#1a1a2e" />
+      </g>
+      <line x1="14" y1="21" x2="18" y2="21" stroke="#1a1a2e" stroke-width="1.5" stroke-linecap="round" />
+    </svg>`;
+
+    netMascotEl.style.animation = "none";
+    
+    if (netFlow > 0) {
+      netPillEl.classList.add('surplus');
+      const surplusPhrases = [
+        "Wah, raja makmur nih! Cuan deras~",
+        "Mantap bossque! Kas keraton penuh!",
+        "Sultan mah bebas! Saldo luber~"
+      ];
+      msg = surplusPhrases[Math.floor(Math.random() * surplusPhrases.length)];
+      mascotHtml = svgLaugh;
+    } else if (netFlow < 0) {
+      netPillEl.classList.add('deficit');
+      const deficitPhrases = [
+        "Waduh... koinnya amblas boss!",
+        "Rakyat menjerit, kas menipis!",
+        "Astaga naga, boncos bulan ini!"
+      ];
+      msg = deficitPhrases[Math.floor(Math.random() * deficitPhrases.length)];
+      mascotHtml = svgCry;
+    } else {
+      msg = "Imbang bro! Gak rugi, gak untung.";
+      mascotHtml = svgNeutral;
+    }
+    
+    netMsgEl.textContent = msg;
+    netMascotEl.innerHTML = mascotHtml;
+  }
+
+  // Pagination
+  const totalItems = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / LEDGER_PER_PAGE));
+  if (ledgerCurrentPage > totalPages) ledgerCurrentPage = totalPages;
+  
+  const startIdx = (ledgerCurrentPage - 1) * LEDGER_PER_PAGE;
+  const pageItems = filtered.slice(startIdx, startIdx + LEDGER_PER_PAGE);
+
+  // Update count badge
+  countEl.textContent = `MENAMPILKAN ${totalItems} TRANSAKSI`;
+
+  if (totalItems === 0) {
+    container.innerHTML = '';
     emptyEl.classList.remove('hidden');
+    paginationEl.innerHTML = '';
     return;
   }
   
   emptyEl.classList.add('hidden');
   
-  tbody.innerHTML = filtered.map(tx => {
+  // Render cards
+  container.innerHTML = pageItems.map(tx => {
     const isIncome = tx.type === 'income';
     const isExpense = tx.type === 'expense';
+    const isTransfer = tx.type === 'transfer';
     
-    // Label
-    let stampText = 'UNKNOWN';
-    let stampColor = '';
-    if (isIncome) { stampText = 'Pemasukan'; stampColor = 'income'; }
-    if (isExpense) { stampText = 'Pengeluaran'; stampColor = 'expense'; }
-    if (!isIncome && !isExpense) { stampText = 'Transfer'; stampColor = 'transfer'; }
+    // Category badge
+    let catText, catClass, catIcon;
+    if (isIncome) {
+      catText = 'Pemasukan';
+      catClass = 'cat-income';
+      catIcon = '💰';
+    } else if (isExpense) {
+      catText = tx.category || 'Pengeluaran';
+      catClass = 'cat-expense';
+      catIcon = '🛒';
+    } else {
+      catText = 'Transfer';
+      catClass = 'cat-transfer';
+      catIcon = '🔄';
+    }
+
+    // Amount display
+    let amountClass = 'neutral';
+    if (isIncome) amountClass = 'positive';
+    if (isExpense) amountClass = 'negative';
     
-    const displayDate = new Date(tx.date).toLocaleDateString('id-ID', {
-      year: 'numeric', month: 'short', day: 'numeric',
-      hour: '2-digit', minute: '2-digit'
-    });
+    // Format date
+    const d = new Date(tx.date);
+    const dateStr = d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+
+    // Source label
+    let sourceLabel = '';
+    if (isIncome) {
+      sourceLabel = getAccountLabel(tx.destination);
+    } else if (isExpense) {
+      sourceLabel = getAccountLabel(tx.source);
+    } else {
+      sourceLabel = `${getAccountLabel(tx.source)} → ${getAccountLabel(tx.destination)}`;
+    }
+
+    // Actions
+    const photoBtn = tx.photo ? `
+      <button class="btn-icon-mini btn-view-mini" onclick="viewPhoto('${tx.id}')" aria-label="Lihat Bukti" title="Lihat Bukti">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      </button>` : '';
+    
+    const deleteBtn = `
+      <button class="btn-icon-mini btn-delete-mini" onclick="deleteLedgerRow('${tx.id}', this)" aria-label="Hapus" title="Hapus">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+      </button>`;
 
     return `
-      <tr class="ledger-row" id="tx_row_${tx.id}">
-        <td>
-          <div style="font-size: 0.9em; font-weight: 800; color: var(--text-primary);">${displayDate}</div>
-        </td>
-        <td style="max-width: 200px;">
-          <div style="font-weight: 800; color: var(--text-primary);">${escHtml(tx.description || '-')}</div>
-        </td>
-        <td>
-          <span class="table-badge ${stampColor}">${stampText}</span>
-        </td>
-        <td>
-          <div style="font-weight: 800; color: var(--text-primary); text-transform: capitalize;">${isIncome ? 'Eksternal' : escHtml(tx.source || '-')}</div>
-        </td>
-        <td>
-          <span class="table-amount ${stampColor}">${formatRp(tx.amount)}</span>
-        </td>
-        <td style="text-align: center;">
-          ${tx.photo ? `
-            <button class="btn-icon-sq btn-view" onclick="viewPhoto('${tx.id}')" aria-label="Lihat Bukti" title="Lihat Bukti">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            </button>
-          ` : ''}
-        </td>
-        <td style="text-align: center;">
-          <button class="btn-icon-sq btn-delete" onclick="deleteLedgerRow('${tx.id}', this)" aria-label="Hapus" title="Hapus">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-          </button>
-        </td>
-      </tr>
+      <div class="tx-card type-${tx.type}" id="tx_row_${tx.id}">
+        <div class="tx-date">${dateStr}</div>
+        <span class="tx-category-badge ${catClass}">${catIcon} ${escHtml(catText)}</span>
+        <div class="tx-description">
+          <span>${escHtml(tx.description || '-')}</span>
+        </div>
+        <div class="tx-amount ${amountClass}">${formatRp(tx.amount)}</div>
+        <span class="tx-source-tag">${escHtml(sourceLabel)}</span>
+        <div class="tx-actions">
+          ${photoBtn}
+          ${deleteBtn}
+        </div>
+      </div>
     `;
   }).join('');
+
+  // Render pagination
+  let paginationHTML = '';
+  
+  // Prev button
+  paginationHTML += `<button class="page-btn ${ledgerCurrentPage <= 1 ? 'disabled' : ''}" onclick="goToLedgerPage(${ledgerCurrentPage - 1})">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+  </button>`;
+
+  // Page numbers
+  for (let i = 1; i <= totalPages; i++) {
+    if (totalPages > 7 && Math.abs(i - ledgerCurrentPage) > 2 && i !== 1 && i !== totalPages) {
+      if (i === ledgerCurrentPage - 3 || i === ledgerCurrentPage + 3) {
+        paginationHTML += `<span style="color: var(--text-muted); font-weight: 800; padding: 0 4px;">•••</span>`;
+      }
+      continue;
+    }
+    paginationHTML += `<button class="page-btn ${i === ledgerCurrentPage ? 'active' : ''}" onclick="goToLedgerPage(${i})">${i}</button>`;
+  }
+  
+  // Next button
+  paginationHTML += `<button class="page-btn ${ledgerCurrentPage >= totalPages ? 'disabled' : ''}" onclick="goToLedgerPage(${ledgerCurrentPage + 1})">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+  </button>`;
+
+  paginationEl.innerHTML = paginationHTML;
+};
+
+const goToLedgerPage = (page) => {
+  playSound('pop');
+  ledgerCurrentPage = page;
+  renderLedger();
+  // Scroll to top of ledger
+  const ledgerEl = $('pageLedger');
+  if (ledgerEl) ledgerEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
 };
 
 const viewPhoto = (txId) => {
@@ -2286,8 +2632,8 @@ const deleteLedgerRow = (txId, btnEl) => {
   confirmBtn.onclick = () => {
     closeModal('confirmModal');
     
-    const row = btnEl.closest('tr');
-    if (row) row.classList.add('row-delete-anim');
+    const card = btnEl.closest('.tx-card');
+    if (card) card.classList.add('row-delete-anim');
     
     setTimeout(() => {
       state.transactions = state.transactions.filter(t => t.id !== txId);
