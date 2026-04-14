@@ -247,11 +247,11 @@ const renderNotifications = () => {
   list.innerHTML = state.notifications.map(n => `
     <div class="item-row" style="align-items:flex-start; margin-bottom: 8px;">
       <div style="margin-right: 12px; margin-top:2px; font-size:1.2rem;">
-        ${n.type === 'error' ? '🔴' : '🟢'}
+        ${n.type === 'error' ? '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#ef4444;"></span>' : '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#22c55e;"></span>'}
       </div>
       <div style="flex:1;">
         <div style="font-weight:700; color:var(--text-primary); font-size:0.9rem;">${escHtml(n.message)}</div>
-        <div style="font-size:0.7rem; color:var(--text-muted); margin-top:4px;">${formatDateTime(n.date)} • 👤 ${escHtml(n.user || 'Sistem')}</div>
+        <div style="font-size:0.7rem; color:var(--text-muted); margin-top:4px;">${formatDateTime(n.date)} • ${escHtml(n.user || 'Sistem')}</div>
       </div>
     </div>
   `).join('');
@@ -1425,10 +1425,10 @@ const drawMapOverlay = (ctx, canvasW, canvasH, lat, lng, callback) => {
       console.warn('Map draw failed:', e);
     }
 
-    // Label badge — "📍 MAPS"
+    // Label badge — "MAPS"
     const labelFontSize = Math.round(canvasW * 0.026);
     ctx.font = `900 ${labelFontSize}px 'Fredoka', sans-serif`;
-    const labelText = '📍 MAPS';
+    const labelText = 'MAPS';
     const labelMetrics = ctx.measureText(labelText);
     const labelW = labelMetrics.width + 20;
     const labelH = labelFontSize + 16;
@@ -1813,51 +1813,349 @@ const resetCameraUI = () => {
 $('themeToggle').addEventListener('click', toggleTheme);
 
 // ===== AUTHENTICATION & INTERACTION =====
+
+// Speech bubble messages for the mascot
+const mascotSpeechMessages = {
+  idle: [
+    "Hai Boss! Ayo masuk ke kerajaanmu!",
+    "Kerajaan menunggumu, Boss!",
+    "Satu langkah lagi menuju istana!",
+    "Harta karunmu aman. Ayo cek!",
+  ],
+  username: [
+    "Hmm, siapa yang datang?",
+    "Oh! Aku kenal kamu! ...kan?",
+    "Ketik yang benar ya, Boss~",
+  ],
+  password: [
+    "Sssttt... aku tutup mata dulu!",
+    "Kata sandi itu rahasia kerajaan!",
+    "Aku nggak ngintip, janji!",
+  ],
+  error: [
+    "Hmm, sepertinya salah...",
+    "Coba lagi, Boss! Jangan menyerah!",
+    "Password atau username keliru!",
+  ],
+  success: [
+    "Selamat datang, Yang Mulia!",
+    "Gerbang terbuka! HORE!",
+  ],
+  poke: [
+    "Hehe, geli Boss!",
+    "Jangan colek-colek~",
+    "Focus login dong, Boss!",
+    "Aku bukan tombol!",
+    "Hwaaaa! Kaget aku!",
+  ],
+};
+
+const getRandomSpeech = (type) => {
+  const msgs = mascotSpeechMessages[type] || mascotSpeechMessages.idle;
+  return msgs[Math.floor(Math.random() * msgs.length)];
+};
+
+// ===== ANIMALESE VOICE ENGINE (Animal Crossing Style — Smooth & Cute) =====
+let mascotAudioCtx = null;
+
+// Pentatonic scale notes — these ALWAYS sound good together, never dissonant
+// C major pentatonic: C D E G A (across 2 octaves) — warm & happy
+const PENTATONIC_NOTES = [
+  523.25, 587.33, 659.25, 783.99, 880.00,  // C5 D5 E5 G5 A5
+  1046.5, 1174.7, 1318.5, 1568.0, 1760.0,  // C6 D6 E6 G6 A6
+];
+
+// Map each letter to a pentatonic note index (loops around the scale)
+const charToNoteIndex = (ch) => {
+  const c = ch.toLowerCase().charCodeAt(0);
+  if (c >= 97 && c <= 122) return (c - 97) % PENTATONIC_NOTES.length; // a-z
+  if (c >= 48 && c <= 57) return (c - 48) % PENTATONIC_NOTES.length;  // 0-9
+  return -1;
+};
+
+const getMascotAudioCtx = () => {
+  try {
+    if (!mascotAudioCtx) {
+      mascotAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (mascotAudioCtx.state === 'suspended') {
+      mascotAudioCtx.resume().catch(() => {});
+    }
+    if (mascotAudioCtx.state === 'suspended') return null;
+    return mascotAudioCtx;
+  } catch (e) {
+    return null;
+  }
+};
+
+/**
+ * Play a single cute "boop" note for a character.
+ * Uses pentatonic scale + low-pass filter = always smooth, never harsh.
+ */
+const playAnimalese = (char) => {
+  const ctx = getMascotAudioCtx();
+  if (!ctx) return;
+
+  const idx = charToNoteIndex(char);
+  if (idx < 0) return; // Skip non-letter/digit
+
+  const baseFreq = PENTATONIC_NOTES[idx];
+  // Tiny random variation (±3%) — subtle, not chaotic
+  const freq = baseFreq * (0.97 + Math.random() * 0.06);
+
+  const now = ctx.currentTime;
+  const duration = 0.07 + Math.random() * 0.03; // Short & bubbly (70-100ms)
+
+  // Single clean sine oscillator — smoothest possible waveform
+  const osc = ctx.createOscillator();
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(freq, now);
+  // Gentle pitch slide down — sounds like a tiny "boop"
+  osc.frequency.exponentialRampToValueAtTime(freq * 0.95, now + duration);
+
+  // Smooth gain envelope — soft fade in, soft fade out (no clicks)
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(0, now);
+  gain.gain.linearRampToValueAtTime(0.04, now + 0.015);      // Soft attack
+  gain.gain.linearRampToValueAtTime(0.035, now + duration * 0.4); // Sustain
+  gain.gain.exponentialRampToValueAtTime(0.001, now + duration);   // Soft release
+
+  // Low-pass filter — removes ALL harsh high frequencies, keeps it mellow
+  const filter = ctx.createBiquadFilter();
+  filter.type = 'lowpass';
+  filter.frequency.setValueAtTime(1800, now); // Cut everything above 1.8kHz
+  filter.Q.setValueAtTime(0.7, now);          // Gentle slope, no resonance peak
+
+  // Chain: oscillator → filter → gain → speakers
+  osc.connect(filter);
+  filter.connect(gain);
+  gain.connect(ctx.destination);
+
+  osc.start(now);
+  osc.stop(now + duration + 0.02);
+};
+
+// Legacy wrapper for any external calls
+const playMascotVoice = () => playAnimalese('a');
+
+// Typing effect for speech bubble with Animalese voice
+let typingTimeout = null;
+let voiceCounter = 0; // Track which chars get voiced
+
+const setMascotSpeech = (text, instant = false, targetId = 'mascotSpeechText') => {
+  const el = $(targetId);
+  if (!el) return;
+  
+  if (typingTimeout) clearTimeout(typingTimeout);
+  voiceCounter = 0;
+  
+  if (instant) {
+    el.textContent = text;
+    return;
+  }
+  
+  el.innerHTML = '<span class="typing-cursor"></span>';
+  let i = 0;
+  
+  const typeChar = () => {
+    if (i < text.length) {
+      const char = text.charAt(i);
+      el.innerHTML = text.substring(0, i + 1) + '<span class="typing-cursor"></span>';
+      
+      // Play sound every ~2 letters — not every single one (less overwhelming)
+      if (/[a-zA-Z0-9]/.test(char)) {
+        voiceCounter++;
+        if (voiceCounter % 2 === 0) {
+          playAnimalese(char);
+        }
+      }
+
+      i++;
+      // Relaxed typing speed with natural rhythm
+      let delay;
+      if (/[\s]/.test(char)) {
+        delay = 55 + Math.random() * 30; // Brief word pause
+      } else if (/[.,!?~…]/.test(char)) {
+        delay = 90 + Math.random() * 50; // Sentence pause
+      } else {
+        delay = 38 + Math.random() * 22; // Normal letter (38-60ms)
+      }
+      typingTimeout = setTimeout(typeChar, delay);
+    } else {
+      el.textContent = text;
+    }
+  };
+  
+  typingTimeout = setTimeout(typeChar, 100);
+};
+
 const initLoginInteractions = () => {
   const userIn = $('loginUsername');
   const passIn = $('loginPassword');
-  const openEyes = $('mascotEyesOpen');
-  const closedEyes = $('mascotEyesClosed');
-  const pupL = $('mascotPupilL');
-  const pupR = $('mascotPupilR');
   const mascot = $('loginMascot');
+  const loginFaceEl = $('loginMascotFace');
 
-  if (!userIn || !passIn || !mascot) return;
+  if (!userIn || !passIn || !mascot || !loginFaceEl) return;
 
+  // --- Set login mascot face from MASCOT_FACES ---
+  let currentLoginFace = 'neutral';
+  const setLoginFace = (faceName) => {
+    if (!MASCOT_FACES[faceName]) faceName = 'neutral';
+    currentLoginFace = faceName;
+    loginFaceEl.innerHTML = MASCOT_FACES[faceName];
+  };
+
+  // --- Helper: get pupils from current face ---
+  const getLoginPupils = () => loginFaceEl.querySelectorAll('.mascot-pupils');
+
+  // Initialize with neutral face
+  setLoginFace('neutral');
+
+  // --- Idle face cycle (rotate expressions while no input focused) ---
+  const LOGIN_IDLE_FACES = ['neutral', 'happy', 'neutral', 'neutral', 'happy'];
+  let loginIdleInterval = null;
+  let loginIdleIdx = 0;
+
+  const startLoginIdle = () => {
+    if (loginIdleInterval) clearInterval(loginIdleInterval);
+    loginIdleInterval = setInterval(() => {
+      if (document.activeElement !== userIn && document.activeElement !== passIn) {
+        loginIdleIdx = (loginIdleIdx + 1) % LOGIN_IDLE_FACES.length;
+        setLoginFace(LOGIN_IDLE_FACES[loginIdleIdx]);
+        setMascotSpeech(getRandomSpeech('idle'));
+      }
+    }, 8000);
+  };
+  startLoginIdle();
+
+  // --- Username focus: curious face, look down ---
+  const USERNAME_FACES = ['neutral', 'happy', 'surprised'];
   userIn.addEventListener('focus', () => {
-    openEyes.style.display = 'block';
-    closedEyes.style.display = 'none';
-    pupL.setAttribute('cy', '18.5');
-    pupR.setAttribute('cy', '18.5');
-    mascot.style.transform = 'scale(1.05)';
+    if (loginIdleInterval) clearInterval(loginIdleInterval);
+    const face = USERNAME_FACES[Math.floor(Math.random() * USERNAME_FACES.length)];
+    setLoginFace(face);
+    // Nudge pupils down
+    const pupils = getLoginPupils();
+    pupils.forEach(p => { p.style.transform = 'translateY(1.5px)'; p.style.transition = 'transform 0.15s ease-out'; });
+    mascot.style.transform = 'scale(1.06)';
+    setMascotSpeech(getRandomSpeech('username'));
   });
 
+  // --- Username input: Pupils follow text length ---
   userIn.addEventListener('input', (e) => {
     const len = Math.min(e.target.value.length, 20);
-    const shift = (len / 20) * 3 - 1.5; 
-    pupL.setAttribute('cx', 12 + shift);
-    pupR.setAttribute('cx', 20 + shift);
+    const shiftX = (len / 20) * 3 - 1.5;
+    const pupils = getLoginPupils();
+    pupils.forEach(p => { p.style.transform = `translate(${shiftX}px, 1.5px)`; p.style.transition = 'transform 0.1s ease-out'; });
   });
 
   userIn.addEventListener('blur', () => {
-    pupL.setAttribute('cx', '12');
-    pupR.setAttribute('cx', '20');
-    pupL.setAttribute('cy', '17');
-    pupR.setAttribute('cy', '17');
-    mascot.style.transform = 'none';
+    const pupils = getLoginPupils();
+    pupils.forEach(p => { p.style.transform = 'translate(0, 0)'; });
+    mascot.style.transform = '';
+    setLoginFace('neutral');
+    startLoginIdle();
   });
 
+  // --- Password focus: closed/shy face ---
+  const PASSWORD_FACES = ['laugh', 'tickled']; // eyes shut
   passIn.addEventListener('focus', () => {
-    openEyes.style.display = 'none';
-    closedEyes.style.display = 'block';
-    mascot.style.transform = 'scale(0.95) translateY(4px) rotate(-3deg)';
+    if (loginIdleInterval) clearInterval(loginIdleInterval);
+    const face = PASSWORD_FACES[Math.floor(Math.random() * PASSWORD_FACES.length)];
+    setLoginFace(face);
+    mascot.style.transform = 'scale(0.96) translateY(6px) rotate(-3deg)';
+    setMascotSpeech(getRandomSpeech('password'));
   });
 
   passIn.addEventListener('blur', () => {
-    openEyes.style.display = 'block';
-    closedEyes.style.display = 'none';
-    mascot.style.transform = 'none';
+    setLoginFace('neutral');
+    mascot.style.transform = '';
+    startLoginIdle();
   });
+
+  // --- Click mascot: POKE with random expression ---
+  const LOGIN_POKE_FACES = [
+    { face: 'tickled', text: 'GYAHAHA! Stop Boss!!' },
+    { face: 'surprised', text: 'HUWAA! Kaget!!' },
+    { face: 'angry', text: 'Ih! Jangan sentuh!' },
+    { face: 'happy', text: 'Hehe~ kena deh!' },
+    { face: 'angry_surprised', text: 'HAH?! APA-APAAN?!' },
+    { face: 'scared', text: 'H-hiii! Jangan tiba-tiba!' },
+    { face: 'laugh', text: 'Ehehe~ sekali lagi~' },
+    { face: 'disgusted', text: 'Ihh tangan Boss bau!' },
+    { face: 'scared_surprised', text: 'ASTAGA!! JANTUNGKU!!' },
+    { face: 'surprised_happy', text: 'OH! Hai Boss~ hehe!' },
+    { face: 'cynical', text: 'Hmm... iseng ya?' },
+    { face: 'happy_disgusted', text: 'Geli tapi lucu~' },
+    { face: 'surprised_scared', text: 'UWAAA!! AMPUN!!' },
+  ];
+  let lastLoginPoke = -1;
+
+  mascot.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (loginIdleInterval) clearInterval(loginIdleInterval);
+    playSound('pop');
+
+    let idx;
+    do { idx = Math.floor(Math.random() * LOGIN_POKE_FACES.length); } while (idx === lastLoginPoke && LOGIN_POKE_FACES.length > 1);
+    lastLoginPoke = idx;
+    const reaction = LOGIN_POKE_FACES[idx];
+
+    setLoginFace(reaction.face);
+    setMascotSpeech(reaction.text);
+
+    // Quick bounce
+    mascot.style.transition = 'transform 0.15s ease';
+    mascot.style.transform = 'scale(1.15) rotate(5deg)';
+    setTimeout(() => {
+      mascot.style.transform = 'scale(0.9) rotate(-5deg)';
+      setTimeout(() => {
+        mascot.style.transition = '';
+        mascot.style.transform = '';
+        // Return to neutral after 2s
+        setTimeout(() => {
+          setLoginFace('neutral');
+          startLoginIdle();
+        }, 2000);
+      }, 150);
+    }, 150);
+  });
+
+  // --- Mouse proximity: Eyes follow cursor (desktop) ---
+  const loginCard = document.querySelector('.login-card');
+  if (loginCard) {
+    loginCard.addEventListener('mousemove', (e) => {
+      // Only track if face has visible pupils and not focused on input
+      if (document.activeElement === userIn || document.activeElement === passIn) return;
+      const pupils = getLoginPupils();
+      if (!pupils.length) return;
+
+      const rect = mascot.getBoundingClientRect();
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      const dx = (e.clientX - cx) / rect.width;
+      const dy = (e.clientY - cy) / rect.height;
+      const maxShift = 1.5;
+      let shiftX = dx * 3;
+      let shiftY = dy * 3;
+      const dist = Math.sqrt(shiftX * shiftX + shiftY * shiftY);
+      if (dist > maxShift) {
+        shiftX = (shiftX / dist) * maxShift;
+        shiftY = (shiftY / dist) * maxShift;
+      }
+      pupils.forEach(p => {
+        p.style.transform = `translate(${shiftX}px, ${shiftY}px)`;
+        p.style.transition = 'transform 0.15s ease-out';
+      });
+    });
+
+    loginCard.addEventListener('mouseleave', () => {
+      if (document.activeElement !== userIn && document.activeElement !== passIn) {
+        const pupils = getLoginPupils();
+        pupils.forEach(p => { p.style.transform = 'translate(0, 0)'; });
+      }
+    });
+  }
 };
 
 const checkAuth = () => {
@@ -1934,6 +2232,20 @@ const handleLogin = (e) => {
   if (expectedPassword && expectedPassword === password) {
     playSound('coin');
     
+    // Mascot celebrates with dynamic face!
+    const loginFaceEl = $('loginMascotFace');
+    const mascotSvg = $('loginMascot');
+    const SUCCESS_FACES = ['happy_surprised', 'surprised_happy', 'laugh', 'happy'];
+    if (loginFaceEl) {
+      const face = SUCCESS_FACES[Math.floor(Math.random() * SUCCESS_FACES.length)];
+      loginFaceEl.innerHTML = MASCOT_FACES[face] || MASCOT_FACES.happy;
+    }
+    if (mascotSvg) {
+      mascotSvg.style.transform = 'scale(1.2) rotate(5deg)';
+      mascotSvg.style.transition = 'transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+    }
+    setMascotSpeech(getRandomSpeech('success'));
+    
     if (rememberMe) {
       localStorage.setItem('nk_loggedIn', 'true');
       localStorage.setItem('nk_loggedInUser', username);
@@ -1964,6 +2276,25 @@ const handleLogin = (e) => {
     
   } else {
     playSound('error');
+    
+    // Mascot reacts to error with dynamic face
+    const loginFaceEl = $('loginMascotFace');
+    const ERROR_FACES = ['angry', 'sad_angry', 'scared', 'angry_surprised', 'sad_surprised', 'angry_sad', 'sad'];
+    if (loginFaceEl) {
+      const face = ERROR_FACES[Math.floor(Math.random() * ERROR_FACES.length)];
+      loginFaceEl.innerHTML = MASCOT_FACES[face] || MASCOT_FACES.angry;
+    }
+    setMascotSpeech(getRandomSpeech('error'));
+    const mascotSvg = $('loginMascot');
+    if (mascotSvg) {
+      mascotSvg.style.transition = 'transform 0.1s ease';
+      mascotSvg.style.transform = 'scale(1.05) rotate(-3deg)';
+      setTimeout(() => {
+        mascotSvg.style.transform = ''; mascotSvg.style.transition = '';
+        // Reset to neutral after shake
+        if (loginFaceEl) loginFaceEl.innerHTML = MASCOT_FACES.neutral;
+      }, 800);
+    }
     
     const card = document.querySelector('.login-card');
     card.style.transform = 'rotate(-1deg) translateX(-10px)';
@@ -2440,7 +2771,7 @@ const renderLedger = () => {
         <circle cx="12" cy="16" r="1.2" fill="#1a1a2e" />
         <circle cx="20" cy="16" r="1.2" fill="#1a1a2e" />
       </g>
-      <line x1="14" y1="21" x2="18" y2="21" stroke="#1a1a2e" stroke-width="1.5" stroke-linecap="round" />
+      <path d="M14 21 Q16 20.5 18 21" stroke="#5a4a3a" stroke-width="0.9" stroke-linecap="round" fill="none"/>
     </svg>`;
 
     netMascotEl.style.animation = "none";
@@ -2470,6 +2801,76 @@ const renderLedger = () => {
     
     netMsgEl.textContent = msg;
     netMascotEl.innerHTML = mascotHtml;
+  }
+
+  // ===== SELISIH ANALYSIS ENGINE =====
+  const analysisEl = $('selisihAnalysis');
+  if (analysisEl) {
+    if (filtered.length === 0) {
+      analysisEl.style.display = 'none';
+      analysisEl.innerHTML = '';
+    } else {
+      let analysisHTML = '';
+      const pct = totalIn > 0 ? ((netFlow / totalIn) * 100).toFixed(0) : 0;
+      const ratio = totalIn > 0 ? (totalOut / totalIn * 100).toFixed(0) : (totalOut > 0 ? 100 : 0);
+
+      // Categorize expenses
+      const expenseByCategory = {};
+      filtered.filter(t => t.type === 'expense').forEach(t => {
+        const cat = (t.category || 'Lainnya');
+        expenseByCategory[cat] = (expenseByCategory[cat] || 0) + t.amount;
+      });
+      const sortedCats = Object.entries(expenseByCategory).sort((a, b) => b[1] - a[1]);
+      const topCategory = sortedCats.length > 0 ? sortedCats[0] : null;
+      const topCatPct = topCategory && totalOut > 0 ? (topCategory[1] / totalOut * 100).toFixed(0) : 0;
+
+      if (netFlow > 0) {
+        // SURPLUS analysis
+        analysisHTML = `<strong>📊 Status: SURPLUS (Sehat)</strong><br>`;
+        analysisHTML += `Kamu berhasil menahan sisa dana sebesar <strong>${pct}%</strong> dari pemasukan periode ini. Total pengeluaranmu hanya <strong>${ratio}%</strong> dari uang yang masuk.<br>`;
+        if (topCategory) {
+          analysisHTML += `<br>💡 <strong>Alasan Surplus:</strong> Realisasi bebanmu tetap di bawah pendapatan, di mana pengeluaran terbesarmu dialokasikan pada <strong>${topCategory[0]}</strong> (${topCatPct}% dari total keluar). `;
+        }
+        if (netFlow > totalOut * 2) {
+          analysisHTML += `Kas terpantau stabil dan bertumbuh positif!`;
+        } else {
+          analysisHTML += `Kondisi kasmu tergolong aman, terapkan terus manajemen ini.`;
+        }
+      } else if (netFlow < 0) {
+        // DEFICIT analysis
+        const deficitAmt = Math.abs(netFlow);
+        analysisHTML = `<strong>⚠️ Status: DEFISIT (Boncos)</strong><br>`;
+        if (totalIn > 0) {
+          const overPct = (deficitAmt / totalIn * 100).toFixed(0);
+          analysisHTML += `Pengeluaranmu melampaui pemasukan! Kamu telah membelanjakan <strong>${ratio}%</strong> dari pendapatan (Over budget <strong>${overPct}%</strong>).<br>`;
+        } else {
+          analysisHTML += `Belum ada pemasukan yang tercatat, tetapi kamu sudah menghabiskan dana sebesar <strong>${formatRp(totalOut)}</strong>!<br>`;
+        }
+        if (topCategory) {
+          analysisHTML += `<br>🔍 <strong>Penyebab Utama:</strong> Kebocoran terbesar berasal dari kategori <strong>${topCategory[0]}</strong> menyita dana <strong>${formatRp(topCategory[1])}</strong> (${topCatPct}% dari beban).`;
+          if (sortedCats.length > 1) {
+            analysisHTML += ` Penguras dana terbesar kedua adalah <strong>${sortedCats[1][0]}</strong>.`;
+          }
+          analysisHTML += ` Pertimbangkan untuk menekan biaya pada sektor tersebut.`;
+        }
+      } else {
+        // ZERO / BALANCE
+        if (totalIn === 0 && totalOut === 0) {
+          analysisHTML = ''; // Handled below
+        } else {
+          analysisHTML = `<strong>⚖️ Status: SEIMBANG (Break Even)</strong><br>`;
+          analysisHTML += `Pemasukan (<strong>${formatRp(totalIn)}</strong>) sama persis dengan Pengeluaran (<strong>${formatRp(totalOut)}</strong>).<br><br>💡 Tidak ada untung maupun rugi. Arus uang hanya menumpang lewat di periode ini!`;
+        }
+      }
+
+      if (analysisHTML === '') {
+        analysisEl.style.display = 'none';
+        analysisEl.innerHTML = '';
+      } else {
+        analysisEl.style.display = 'block';
+        analysisEl.innerHTML = analysisHTML;
+      }
+    }
   }
 
   // Pagination
@@ -2503,15 +2904,15 @@ const renderLedger = () => {
     if (isIncome) {
       catText = 'Pemasukan';
       catClass = 'cat-income';
-      catIcon = '💰';
+      catIcon = 'Rp';
     } else if (isExpense) {
       catText = tx.category || 'Pengeluaran';
       catClass = 'cat-expense';
-      catIcon = '🛒';
+      catIcon = '$';
     } else {
       catText = 'Transfer';
       catClass = 'cat-transfer';
-      catIcon = '🔄';
+      catIcon = '~';
     }
 
     // Amount display
@@ -2647,5 +3048,964 @@ const deleteLedgerRow = (txId, btnEl) => {
   openModal('confirmModal');
 };
 
-init();
+// ===== INTERACTIVE MASCOT =====
 
+// --- SVG Face Templates (with eyebrows & soft eyes) ---
+// 27 unique expressions covering all emotional combinations
+const MASCOT_FACES = {
+
+  // ========== BASIC EMOTIONS ==========
+
+  neutral: `
+    <path d="M10 12.5 Q12 11 14 12" stroke="#5a4a3a" stroke-width="0.9" stroke-linecap="round" fill="none"/>
+    <path d="M18 12 Q20 11 22 12.5" stroke="#5a4a3a" stroke-width="0.9" stroke-linecap="round" fill="none"/>
+    <g class="mascot-blink-group">
+      <ellipse cx="12" cy="15.5" rx="2.8" ry="3" fill="#fff" stroke="#1a1a2e" stroke-width="0.5"/>
+      <ellipse cx="20" cy="15.5" rx="2.8" ry="3" fill="#fff" stroke="#1a1a2e" stroke-width="0.5"/>
+      <g class="mascot-pupils">
+        <circle cx="12" cy="16" r="1.1" fill="#1a1a2e"/>
+        <circle cx="20" cy="16" r="1.1" fill="#1a1a2e"/>
+        <circle cx="12.5" cy="15.6" r="0.4" fill="#fff" opacity="0.8"/>
+        <circle cx="20.5" cy="15.6" r="0.4" fill="#fff" opacity="0.8"/>
+      </g>
+    </g>
+    <path d="M14 21 Q16 22.5 18 21" fill="none" stroke="#5a4a3a" stroke-width="0.8" stroke-linecap="round"/>
+  `,
+
+  happy: `
+    <path d="M10 10.5 Q12 9 14 10.5" stroke="#5a4a3a" stroke-width="0.8" stroke-linecap="round" fill="none"/>
+    <path d="M18 10.5 Q20 9 22 10.5" stroke="#5a4a3a" stroke-width="0.8" stroke-linecap="round" fill="none"/>
+    <g class="mascot-blink-group">
+      <ellipse cx="12" cy="15" rx="2.8" ry="3.2" fill="#fff" stroke="#1a1a2e" stroke-width="0.5"/>
+      <ellipse cx="20" cy="15" rx="2.8" ry="3.2" fill="#fff" stroke="#1a1a2e" stroke-width="0.5"/>
+      <g class="mascot-pupils">
+        <circle cx="12" cy="15.5" r="1.1" fill="#1a1a2e"/>
+        <circle cx="20" cy="15.5" r="1.1" fill="#1a1a2e"/>
+        <circle cx="12.5" cy="15.1" r="0.4" fill="#fff" opacity="0.8"/>
+        <circle cx="20.5" cy="15.1" r="0.4" fill="#fff" opacity="0.8"/>
+      </g>
+    </g>
+    <circle cx="9.5" cy="18.5" r="2" fill="#ffb3ba" opacity="0.7"/>
+    <circle cx="22.5" cy="18.5" r="2" fill="#ffb3ba" opacity="0.7"/>
+    <path d="M13.5 19.5 Q16 23.5 18.5 19.5" fill="none" stroke="#5a4a3a" stroke-width="1.1" stroke-linecap="round"/>
+  `,
+
+  laugh: `
+    <path d="M10 10 Q12 8 14 10" stroke="#5a4a3a" stroke-width="0.8" stroke-linecap="round" fill="none"/>
+    <path d="M18 10 Q20 8 22 10" stroke="#5a4a3a" stroke-width="0.8" stroke-linecap="round" fill="none"/>
+    <path d="M10 16 Q12 13.5 14 16" stroke="#1a1a2e" stroke-width="2" stroke-linecap="round" fill="none"/>
+    <path d="M18 16 Q20 13.5 22 16" stroke="#1a1a2e" stroke-width="2" stroke-linecap="round" fill="none"/>
+    <circle cx="9.5" cy="17.5" r="2.5" fill="#ffb3ba" opacity="0.7"/>
+    <circle cx="22.5" cy="17.5" r="2.5" fill="#ffb3ba" opacity="0.7"/>
+    <path d="M13 19 Q16 25 19 19 Z" fill="#1a1a2e"/>
+    <path d="M14 21 Q16 20 18 21" fill="#e85d75" stroke="none"/>
+  `,
+
+  sad: `
+    <path d="M10 12 Q12 10.5 14 11.5" stroke="#5a4a3a" stroke-width="0.9" stroke-linecap="round" fill="none"/>
+    <path d="M18 11.5 Q20 10.5 22 12" stroke="#5a4a3a" stroke-width="0.9" stroke-linecap="round" fill="none"/>
+    <g class="mascot-blink-group">
+      <ellipse cx="12" cy="15.5" rx="2.8" ry="3" fill="#fff" stroke="#1a1a2e" stroke-width="0.5"/>
+      <ellipse cx="20" cy="15.5" rx="2.8" ry="3" fill="#fff" stroke="#1a1a2e" stroke-width="0.5"/>
+      <g class="mascot-pupils">
+        <circle cx="12" cy="16" r="1" fill="#1a1a2e"/>
+        <circle cx="20" cy="16" r="1" fill="#1a1a2e"/>
+      </g>
+    </g>
+    <ellipse cx="14.8" cy="19" rx="0.8" ry="1.5" fill="#5b9de9" opacity="0.85">
+      <animate attributeName="cy" values="19;22;19" dur="1.8s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0.85;0.2;0.85" dur="1.8s" repeatCount="indefinite"/>
+    </ellipse>
+    <path d="M14 22 Q16 19.5 18 22" stroke="#5a4a3a" stroke-width="0.9" stroke-linecap="round" fill="none"/>
+  `,
+
+  angry: `
+    <path d="M10 12.5 Q12 10.5 14 11.5" stroke="#5a4a3a" stroke-width="1.0" stroke-linecap="round" fill="none"/>
+    <path d="M18 11.5 Q20 10.5 22 12.5" stroke="#5a4a3a" stroke-width="1.0" stroke-linecap="round" fill="none"/>
+    <g class="mascot-blink-group">
+      <ellipse cx="12" cy="16" rx="2.8" ry="3" fill="#fff" stroke="#1a1a2e" stroke-width="0.5"/>
+      <ellipse cx="20" cy="16" rx="2.8" ry="3" fill="#fff" stroke="#1a1a2e" stroke-width="0.5"/>
+      <g class="mascot-pupils">
+        <circle cx="12" cy="16.5" r="1.4" fill="#1a1a2e"/>
+        <circle cx="20" cy="16.5" r="1.4" fill="#1a1a2e"/>
+        <circle cx="12" cy="16" r="0.5" fill="#c0392b"/>
+        <circle cx="20" cy="16" r="0.5" fill="#c0392b"/>
+      </g>
+    </g>
+    <g opacity="0.7">
+      <path d="M7 9 L8.5 10 L7.5 10.5 L9 11.5" stroke="#e74c3c" stroke-width="0.8" fill="none" stroke-linecap="round"/>
+    </g>
+    <path d="M14 22 Q16 20 18 22" stroke="#5a4a3a" stroke-width="1.1" stroke-linecap="round" fill="none"/>
+  `,
+
+  scared: `
+    <!-- Takut: Alis naik tinggi, mata besar lebar, mulut O kecil -->
+    <path d="M10 10 Q12 8 14 10.5" stroke="#5a4a3a" stroke-width="0.8" stroke-linecap="round" fill="none"/>
+    <path d="M18 10.5 Q20 8 22 10" stroke="#5a4a3a" stroke-width="0.8" stroke-linecap="round" fill="none"/>
+    <g class="mascot-blink-group">
+      <ellipse cx="12" cy="16" rx="3" ry="3.5" fill="#fff" stroke="#1a1a2e" stroke-width="0.5"/>
+      <ellipse cx="20" cy="16" rx="3" ry="3.5" fill="#fff" stroke="#1a1a2e" stroke-width="0.5"/>
+      <g class="mascot-pupils">
+        <circle cx="12" cy="16.5" r="0.9" fill="#1a1a2e"/>
+        <circle cx="20" cy="16.5" r="0.9" fill="#1a1a2e"/>
+      </g>
+    </g>
+    <ellipse cx="16" cy="22" rx="1.5" ry="1.8" fill="#1a1a2e"/>
+    <!-- Keringat dingin -->
+    <ellipse cx="7.5" cy="14" rx="0.6" ry="1.2" fill="#5b9de9" opacity="0.7">
+      <animate attributeName="cy" values="14;18;14" dur="1.5s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0.7;0;0.7" dur="1.5s" repeatCount="indefinite"/>
+    </ellipse>
+  `,
+
+  disgusted: `
+    <!-- Jijik: Satu alis turun satu naik, mata menyipit, mulut miring -->
+    <path d="M10 12 Q12 11.5 14 12.5" stroke="#5a4a3a" stroke-width="0.9" stroke-linecap="round" fill="none"/>
+    <path d="M18 11.5 Q20 10 22 11" stroke="#5a4a3a" stroke-width="0.8" stroke-linecap="round" fill="none"/>
+    <g class="mascot-blink-group">
+      <ellipse cx="12" cy="16" rx="2.3" ry="2.5" fill="#fff" stroke="#1a1a2e" stroke-width="0.5"/>
+      <ellipse cx="20" cy="15.5" rx="2.8" ry="3" fill="#fff" stroke="#1a1a2e" stroke-width="0.5"/>
+      <g class="mascot-pupils">
+        <circle cx="12" cy="16.5" r="0.9" fill="#1a1a2e"/>
+        <circle cx="20" cy="16" r="1" fill="#1a1a2e"/>
+      </g>
+    </g>
+    <circle cx="9" cy="18" r="1.5" fill="#b8e994" opacity="0.5"/>
+    <path d="M13 21 Q15 22 17 20.5 Q18 21.5 19 21" stroke="#5a4a3a" stroke-width="0.9" stroke-linecap="round" fill="none"/>
+  `,
+
+  surprised: `
+    <!-- Terkejut: Alis sangat tinggi, mata bulat besar, mulut O -->
+    <path d="M9.5 9 Q12 7 14.5 9" stroke="#5a4a3a" stroke-width="0.9" stroke-linecap="round" fill="none"/>
+    <path d="M17.5 9 Q20 7 22.5 9" stroke="#5a4a3a" stroke-width="0.9" stroke-linecap="round" fill="none"/>
+    <g class="mascot-blink-group">
+      <ellipse cx="12" cy="15.5" rx="3" ry="3.8" fill="#fff" stroke="#1a1a2e" stroke-width="0.5"/>
+      <ellipse cx="20" cy="15.5" rx="3" ry="3.8" fill="#fff" stroke="#1a1a2e" stroke-width="0.5"/>
+      <g class="mascot-pupils">
+        <circle cx="12" cy="16" r="1.5" fill="#1a1a2e"/>
+        <circle cx="20" cy="16" r="1.5" fill="#1a1a2e"/>
+        <circle cx="12.6" cy="15.2" r="0.5" fill="#fff" opacity="0.9"/>
+        <circle cx="20.6" cy="15.2" r="0.5" fill="#fff" opacity="0.9"/>
+      </g>
+    </g>
+    <ellipse cx="16" cy="22.5" rx="2" ry="2.5" fill="#1a1a2e"/>
+    <ellipse cx="16" cy="22" rx="1.2" ry="1.5" fill="#e85d75"/>
+  `,
+
+  tickled: `
+    <path d="M10 9 Q12 7 14 9" stroke="#5a4a3a" stroke-width="0.9" stroke-linecap="round" fill="none"/>
+    <path d="M18 9 Q20 7 22 9" stroke="#5a4a3a" stroke-width="0.9" stroke-linecap="round" fill="none"/>
+    <path d="M10 15.5 Q12 13 14 15.5" stroke="#5a4a3a" stroke-width="1.3" stroke-linecap="round" fill="none"/>
+    <path d="M18 15.5 Q20 13 22 15.5" stroke="#5a4a3a" stroke-width="1.3" stroke-linecap="round" fill="none"/>
+    <circle cx="9" cy="17" r="2.8" fill="#ffb3ba" opacity="0.8"/>
+    <circle cx="23" cy="17" r="2.8" fill="#ffb3ba" opacity="0.8"/>
+    <circle cx="8.5" cy="15" r="0.8" fill="#5b9de9" opacity="0.7">
+      <animate attributeName="cy" values="15;13;15" dur="0.4s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="23.5" cy="15" r="0.8" fill="#5b9de9" opacity="0.7">
+      <animate attributeName="cy" values="15;13;15" dur="0.5s" repeatCount="indefinite"/>
+    </circle>
+    <path d="M12.5 19 Q16 26 19.5 19 Z" fill="#1a1a2e"/>
+    <ellipse cx="16" cy="22" rx="1.8" ry="1" fill="#e85d75"/>
+    <circle cx="6" cy="12" r="0.6" fill="#5b9de9" opacity="0.6">
+      <animate attributeName="cx" values="6;4;6" dur="0.3s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="26" cy="12" r="0.6" fill="#5b9de9" opacity="0.6">
+      <animate attributeName="cx" values="26;28;26" dur="0.3s" repeatCount="indefinite"/>
+    </circle>
+  `,
+
+  // ========== COMPOUND EMOTIONS ==========
+
+  // Bahagia + Terkejut → Takjub (amazed)
+  happy_surprised: `
+    <!-- Takjub: alis tinggi, mata bersinar lebar, mulut O besar + blush -->
+    <path d="M9.5 8.5 Q12 6.5 14.5 8.5" stroke="#5a4a3a" stroke-width="0.8" stroke-linecap="round" fill="none"/>
+    <path d="M17.5 8.5 Q20 6.5 22.5 8.5" stroke="#5a4a3a" stroke-width="0.8" stroke-linecap="round" fill="none"/>
+    <g class="mascot-blink-group">
+      <ellipse cx="12" cy="15" rx="3.2" ry="4" fill="#fff" stroke="#1a1a2e" stroke-width="0.5"/>
+      <ellipse cx="20" cy="15" rx="3.2" ry="4" fill="#fff" stroke="#1a1a2e" stroke-width="0.5"/>
+      <g class="mascot-pupils">
+        <circle cx="12" cy="15.5" r="1.6" fill="#1a1a2e"/>
+        <circle cx="20" cy="15.5" r="1.6" fill="#1a1a2e"/>
+        <circle cx="12.7" cy="14.5" r="0.7" fill="#fff" opacity="0.9"/>
+        <circle cx="20.7" cy="14.5" r="0.7" fill="#fff" opacity="0.9"/>
+        <!-- bintang kecil di mata -->
+        <circle cx="11.3" cy="14" r="0.3" fill="#f6a723" opacity="0.8"/>
+        <circle cx="19.3" cy="14" r="0.3" fill="#f6a723" opacity="0.8"/>
+      </g>
+    </g>
+    <circle cx="9" cy="18" r="2.2" fill="#ffb3ba" opacity="0.7"/>
+    <circle cx="23" cy="18" r="2.2" fill="#ffb3ba" opacity="0.7"/>
+    <ellipse cx="16" cy="22" rx="2.2" ry="2.5" fill="#1a1a2e"/>
+    <ellipse cx="16" cy="21.8" rx="1.3" ry="1.2" fill="#e85d75"/>
+    <!-- sparkle -->
+    <g opacity="0.6">
+      <line x1="6" y1="8" x2="7" y2="9" stroke="#f6a723" stroke-width="0.8"/>
+      <line x1="7" y1="8" x2="6" y2="9" stroke="#f6a723" stroke-width="0.8"/>
+      <line x1="25" y1="8" x2="26" y2="9" stroke="#f6a723" stroke-width="0.8"/>
+      <line x1="26" y1="8" x2="25" y2="9" stroke="#f6a723" stroke-width="0.8"/>
+    </g>
+  `,
+
+  // Bahagia + Jijik → senyum paksa, satu mata menyipit
+  happy_disgusted: `
+    <!-- Senyum jijik: alis asimetris, mata menyipit sebelah, senyum canggung -->
+    <path d="M10 10.5 Q12 9.5 14 11" stroke="#5a4a3a" stroke-width="0.8" stroke-linecap="round" fill="none"/>
+    <path d="M18 12.5 Q20 11.5 22 12" stroke="#5a4a3a" stroke-width="0.9" stroke-linecap="round" fill="none"/>
+    <g class="mascot-blink-group">
+      <ellipse cx="12" cy="15" rx="2.8" ry="3.2" fill="#fff" stroke="#1a1a2e" stroke-width="0.5"/>
+      <ellipse cx="20" cy="15.5" rx="2.3" ry="2.5" fill="#fff" stroke="#1a1a2e" stroke-width="0.5"/>
+      <g class="mascot-pupils">
+        <circle cx="12" cy="15.5" r="1.1" fill="#1a1a2e"/>
+        <circle cx="20" cy="16.2" r="0.8" fill="#1a1a2e"/>
+      </g>
+    </g>
+    <circle cx="9.5" cy="18" r="1.5" fill="#b8e994" opacity="0.4"/>
+    <circle cx="22.5" cy="18" r="1.5" fill="#ffb3ba" opacity="0.5"/>
+    <path d="M13 20.5 Q16 23 18 20 L18.5 20.5" stroke="#5a4a3a" stroke-width="0.9" stroke-linecap="round" fill="none"/>
+  `,
+
+  // Sedih + Terkejut → kaget sedih
+  sad_surprised: `
+    <!-- Sedih kaget: alis terangkat tapi miring sedih, mata basah besar, mulut O kecil -->
+    <path d="M10 10 Q12 8 14 10.5" stroke="#5a4a3a" stroke-width="0.8" stroke-linecap="round" fill="none"/>
+    <path d="M18 10.5 Q20 8 22 10" stroke="#5a4a3a" stroke-width="0.8" stroke-linecap="round" fill="none"/>
+    <g class="mascot-blink-group">
+      <ellipse cx="12" cy="16" rx="2.8" ry="3.2" fill="#fff" stroke="#1a1a2e" stroke-width="0.5"/>
+      <ellipse cx="20" cy="16" rx="2.8" ry="3.2" fill="#fff" stroke="#1a1a2e" stroke-width="0.5"/>
+      <g class="mascot-pupils">
+        <circle cx="12" cy="16.5" r="1.2" fill="#1a1a2e"/>
+        <circle cx="20" cy="16.5" r="1.2" fill="#1a1a2e"/>
+      </g>
+    </g>
+    <ellipse cx="14.5" cy="19.5" rx="0.7" ry="1.2" fill="#5b9de9" opacity="0.8">
+      <animate attributeName="cy" values="19.5;22;19.5" dur="1.5s" repeatCount="indefinite"/>
+    </ellipse>
+    <ellipse cx="16" cy="22.5" rx="1.5" ry="1.5" fill="#1a1a2e"/>
+  `,
+
+  // Sedih + Marah → marah terluka
+  sad_angry: `
+    <!-- Marah tapi nangis: alis V tapi bergetar, mata tajam + air mata -->
+    <path d="M10 12 Q12 10.5 14 11.5" stroke="#5a4a3a" stroke-width="1.0" stroke-linecap="round" fill="none"/>
+    <path d="M18 11.5 Q20 10.5 22 12" stroke="#5a4a3a" stroke-width="1.0" stroke-linecap="round" fill="none"/>
+    <g class="mascot-blink-group">
+      <ellipse cx="12" cy="16" rx="2.8" ry="3" fill="#fff" stroke="#1a1a2e" stroke-width="0.5"/>
+      <ellipse cx="20" cy="16" rx="2.8" ry="3" fill="#fff" stroke="#1a1a2e" stroke-width="0.5"/>
+      <g class="mascot-pupils">
+        <circle cx="12" cy="16.5" r="1.2" fill="#1a1a2e"/>
+        <circle cx="20" cy="16.5" r="1.2" fill="#1a1a2e"/>
+        <circle cx="12" cy="16" r="0.4" fill="#c0392b"/>
+        <circle cx="20" cy="16" r="0.4" fill="#c0392b"/>
+      </g>
+    </g>
+    <ellipse cx="15" cy="19" rx="0.7" ry="1.3" fill="#5b9de9" opacity="0.8">
+      <animate attributeName="cy" values="19;22;19" dur="1.6s" repeatCount="indefinite"/>
+    </ellipse>
+    <ellipse cx="17.5" cy="19.5" rx="0.7" ry="1.3" fill="#5b9de9" opacity="0.6">
+      <animate attributeName="cy" values="19.5;22.5;19.5" dur="2s" repeatCount="indefinite"/>
+    </ellipse>
+    <path d="M13.5 22 Q16 20 18.5 22" stroke="#5a4a3a" stroke-width="1.1" stroke-linecap="round" fill="none"/>
+    <g opacity="0.6">
+      <path d="M7 9 L8.5 10 L7.5 10.5 L9 11.5" stroke="#e74c3c" stroke-width="0.7" fill="none" stroke-linecap="round"/>
+    </g>
+  `,
+
+  // Sedih + Takut → miris (anxious despair)
+  sad_scared: `
+    <!-- Miris: alis terangkat + miring sedih, mata berkaca, mulut zigzag bergetar -->
+    <path d="M10 11 Q12 9.5 14 10.5" stroke="#5a4a3a" stroke-width="0.9" stroke-linecap="round" fill="none"/>
+    <path d="M18 10.5 Q20 9.5 22 11" stroke="#5a4a3a" stroke-width="0.9" stroke-linecap="round" fill="none"/>
+    <g class="mascot-blink-group">
+      <ellipse cx="12" cy="16" rx="2.5" ry="3" fill="#fff" stroke="#1a1a2e" stroke-width="0.5"/>
+      <ellipse cx="20" cy="16" rx="2.5" ry="3" fill="#fff" stroke="#1a1a2e" stroke-width="0.5"/>
+      <g class="mascot-pupils">
+        <circle cx="12" cy="16.5" r="0.8" fill="#1a1a2e"/>
+        <circle cx="20" cy="16.5" r="0.8" fill="#1a1a2e"/>
+      </g>
+    </g>
+    <ellipse cx="14.8" cy="19" rx="0.6" ry="1" fill="#5b9de9" opacity="0.7">
+      <animate attributeName="cy" values="19;21;19" dur="1.5s" repeatCount="indefinite"/>
+    </ellipse>
+    <ellipse cx="7" cy="14" rx="0.5" ry="1" fill="#5b9de9" opacity="0.6">
+      <animate attributeName="cy" values="14;17;14" dur="1.3s" repeatCount="indefinite"/>
+    </ellipse>
+    <path d="M13 22 L14.5 21 L16 22 L17.5 21 L19 22" stroke="#5a4a3a" stroke-width="0.8" stroke-linecap="round" fill="none">
+      <animate attributeName="d" values="M13 22 L14.5 21 L16 22 L17.5 21 L19 22;M13 21.8 L14.5 21.2 L16 21.8 L17.5 21.2 L19 21.8;M13 22 L14.5 21 L16 22 L17.5 21 L19 22" dur="0.5s" repeatCount="indefinite"/>
+    </path>
+  `,
+
+  // Sedih + Jijik → menderita
+  sad_disgusted: `
+    <!-- Jijik nangis: alis satu naik satu miring sedih, mata datar + air mata, mulut jijik -->
+    <path d="M10 12 Q12 10.5 14 11.5" stroke="#5a4a3a" stroke-width="0.9" stroke-linecap="round" fill="none"/>
+    <path d="M18 12.5 Q20 11.5 22 12" stroke="#5a4a3a" stroke-width="0.9" stroke-linecap="round" fill="none"/>
+    <g class="mascot-blink-group">
+      <ellipse cx="12" cy="15.5" rx="2.8" ry="2.8" fill="#fff" stroke="#1a1a2e" stroke-width="0.5"/>
+      <ellipse cx="20" cy="15.5" rx="2.3" ry="2.5" fill="#fff" stroke="#1a1a2e" stroke-width="0.5"/>
+      <g class="mascot-pupils">
+        <circle cx="12" cy="16" r="0.9" fill="#1a1a2e"/>
+        <circle cx="20" cy="16.2" r="0.8" fill="#1a1a2e"/>
+      </g>
+    </g>
+    <circle cx="9" cy="18" r="1.5" fill="#b8e994" opacity="0.5"/>
+    <ellipse cx="15" cy="19" rx="0.7" ry="1.2" fill="#5b9de9" opacity="0.7">
+      <animate attributeName="cy" values="19;21.5;19" dur="1.8s" repeatCount="indefinite"/>
+    </ellipse>
+    <path d="M13.5 21.5 Q15 23 17 21 Q18 22 19 21.5" stroke="#5a4a3a" stroke-width="0.8" stroke-linecap="round" fill="none"/>
+  `,
+
+  // Takut + Terkejut → horror
+  scared_surprised: `
+    <!-- Horror: alis sangat melengkung tinggi, mata super besar, mulut O lebar + keringat -->
+    <path d="M9 8.5 Q12 6 15 8.5" stroke="#5a4a3a" stroke-width="1.0" stroke-linecap="round" fill="none"/>
+    <path d="M17 8.5 Q20 6 23 8.5" stroke="#5a4a3a" stroke-width="1.0" stroke-linecap="round" fill="none"/>
+    <g class="mascot-blink-group">
+      <ellipse cx="12" cy="15.5" rx="3.5" ry="4" fill="#fff" stroke="#1a1a2e" stroke-width="0.6"/>
+      <ellipse cx="20" cy="15.5" rx="3.5" ry="4" fill="#fff" stroke="#1a1a2e" stroke-width="0.6"/>
+      <g class="mascot-pupils">
+        <circle cx="12" cy="16" r="0.8" fill="#1a1a2e"/>
+        <circle cx="20" cy="16" r="0.8" fill="#1a1a2e"/>
+      </g>
+    </g>
+    <ellipse cx="16" cy="23" rx="2.5" ry="2.2" fill="#1a1a2e"/>
+    <ellipse cx="7" cy="13" rx="0.7" ry="1.5" fill="#5b9de9" opacity="0.7">
+      <animate attributeName="cy" values="13;18;13" dur="1.2s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0.7;0;0.7" dur="1.2s" repeatCount="indefinite"/>
+    </ellipse>
+    <ellipse cx="25" cy="14" rx="0.7" ry="1.5" fill="#5b9de9" opacity="0.6">
+      <animate attributeName="cy" values="14;19;14" dur="1.4s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0.6;0;0.6" dur="1.4s" repeatCount="indefinite"/>
+    </ellipse>
+  `,
+
+  // Takut + Marah → takut tapi berani
+  scared_angry: `
+    <!-- Fight-or-flight: alis V tapi bergetar, mata besar tajam, mulut bergetar, keringat -->
+    <path d="M10 12 Q12 10.5 14 11" stroke="#5a4a3a" stroke-width="1.0" stroke-linecap="round" fill="none">
+      <animate attributeName="d" values="M10 12 Q12 10.5 14 11;M10 11.5 Q12 10.5 14 11;M10 12 Q12 10.5 14 11" dur="0.3s" repeatCount="indefinite"/>
+    </path>
+    <path d="M18 11 Q20 10.5 22 12" stroke="#5a4a3a" stroke-width="1.0" stroke-linecap="round" fill="none">
+      <animate attributeName="d" values="M18 11 Q20 10.5 22 12;M18 11 Q20 10.5 22 11.5;M18 11 Q20 10.5 22 12" dur="0.3s" repeatCount="indefinite"/>
+    </path>
+    <g class="mascot-blink-group">
+      <ellipse cx="12" cy="16" rx="2.8" ry="3" fill="#fff" stroke="#1a1a2e" stroke-width="0.5"/>
+      <ellipse cx="20" cy="16" rx="2.8" ry="3" fill="#fff" stroke="#1a1a2e" stroke-width="0.5"/>
+      <g class="mascot-pupils">
+        <circle cx="12" cy="16" r="1.3" fill="#1a1a2e"/>
+        <circle cx="20" cy="16" r="1.3" fill="#1a1a2e"/>
+        <circle cx="12" cy="15.5" r="0.4" fill="#c0392b"/>
+        <circle cx="20" cy="15.5" r="0.4" fill="#c0392b"/>
+      </g>
+    </g>
+    <ellipse cx="7" cy="12" rx="0.5" ry="1" fill="#5b9de9" opacity="0.7">
+      <animate attributeName="cy" values="12;16;12" dur="1s" repeatCount="indefinite"/>
+    </ellipse>
+    <path d="M13.5 22 Q16 20.5 18.5 22" stroke="#5a4a3a" stroke-width="0.9" stroke-linecap="round" fill="none">
+      <animate attributeName="d" values="M13.5 22 Q16 20.5 18.5 22;M13.5 21.8 Q16 20.8 18.5 21.8;M13.5 22 Q16 20.5 18.5 22" dur="0.4s" repeatCount="indefinite"/>
+    </path>
+  `,
+
+  // Takut + Jijik → ngeri (creeped out)
+  scared_disgusted: `
+    <!-- Ngeri: alis asimetris, satu mata besar satu menyipit, mulut mengerut, keringat -->
+    <path d="M10 10 Q12 8.5 14 10" stroke="#5a4a3a" stroke-width="0.8" stroke-linecap="round" fill="none"/>
+    <path d="M18 12.5 Q20 11.5 22 12" stroke="#5a4a3a" stroke-width="0.9" stroke-linecap="round" fill="none"/>
+    <g class="mascot-blink-group">
+      <ellipse cx="12" cy="16" rx="3" ry="3.5" fill="#fff" stroke="#1a1a2e" stroke-width="0.5"/>
+      <ellipse cx="20" cy="15.5" rx="2.3" ry="2.5" fill="#fff" stroke="#1a1a2e" stroke-width="0.5"/>
+      <g class="mascot-pupils">
+        <circle cx="12" cy="16.5" r="0.8" fill="#1a1a2e"/>
+        <circle cx="20" cy="16.2" r="0.8" fill="#1a1a2e"/>
+      </g>
+    </g>
+    <circle cx="22.5" cy="18" r="1.5" fill="#b8e994" opacity="0.5"/>
+    <ellipse cx="7" cy="14" rx="0.5" ry="1.2" fill="#5b9de9" opacity="0.6">
+      <animate attributeName="cy" values="14;17;14" dur="1.3s" repeatCount="indefinite"/>
+    </ellipse>
+    <path d="M14 22 Q15 21 16 22 Q17 21 18 22" stroke="#5a4a3a" stroke-width="0.8" stroke-linecap="round" fill="none"/>
+  `,
+
+  // Marah + Terkejut → murka kaget
+  angry_surprised: `
+    <!-- Murka kaget: alis V tajam, mata melotot, mulut terbuka lebar -->
+    <path d="M10 12 Q12 10 14 11" stroke="#5a4a3a" stroke-width="1.0" stroke-linecap="round" fill="none"/>
+    <path d="M18 11 Q20 10 22 12" stroke="#5a4a3a" stroke-width="1.0" stroke-linecap="round" fill="none"/>
+    <g class="mascot-blink-group">
+      <ellipse cx="12" cy="16" rx="3" ry="3.5" fill="#fff" stroke="#1a1a2e" stroke-width="0.5"/>
+      <ellipse cx="20" cy="16" rx="3" ry="3.5" fill="#fff" stroke="#1a1a2e" stroke-width="0.5"/>
+      <g class="mascot-pupils">
+        <circle cx="12" cy="16" r="1.5" fill="#1a1a2e"/>
+        <circle cx="20" cy="16" r="1.5" fill="#1a1a2e"/>
+        <circle cx="12" cy="15.5" r="0.5" fill="#c0392b"/>
+        <circle cx="20" cy="15.5" r="0.5" fill="#c0392b"/>
+      </g>
+    </g>
+    <g opacity="0.8">
+      <path d="M7 8 L8.5 9 L7.5 9.5 L9 10.5" stroke="#e74c3c" stroke-width="0.9" fill="none" stroke-linecap="round"/>
+      <path d="M25 8 L23.5 9 L24.5 9.5 L23 10.5" stroke="#e74c3c" stroke-width="0.9" fill="none" stroke-linecap="round"/>
+    </g>
+    <ellipse cx="16" cy="22.5" rx="2.2" ry="2" fill="#1a1a2e"/>
+  `,
+
+  // Marah + Jijik → benci (hatred)
+  angry_disgusted: `
+    <!-- Benci: alis V tajam, mata menyipit sinis, mulut berkerut jijik + vein -->
+    <path d="M10 12.5 Q12 10.5 14 11.5" stroke="#5a4a3a" stroke-width="1.0" stroke-linecap="round" fill="none"/>
+    <path d="M18 11.5 Q20 10.5 22 12.5" stroke="#5a4a3a" stroke-width="1.0" stroke-linecap="round" fill="none"/>
+    <g class="mascot-blink-group">
+      <ellipse cx="12" cy="16" rx="2.3" ry="2.5" fill="#fff" stroke="#1a1a2e" stroke-width="0.5"/>
+      <ellipse cx="20" cy="16" rx="2.3" ry="2.5" fill="#fff" stroke="#1a1a2e" stroke-width="0.5"/>
+      <g class="mascot-pupils">
+        <circle cx="12" cy="16.5" r="1.2" fill="#1a1a2e"/>
+        <circle cx="20" cy="16.5" r="1.2" fill="#1a1a2e"/>
+        <circle cx="12" cy="16" r="0.4" fill="#c0392b"/>
+        <circle cx="20" cy="16" r="0.4" fill="#c0392b"/>
+      </g>
+    </g>
+    <g opacity="0.8">
+      <path d="M7 9 L8.5 10 L7.5 10.5 L9 11.5" stroke="#e74c3c" stroke-width="0.9" fill="none" stroke-linecap="round"/>
+    </g>
+    <circle cx="9" cy="18" r="1.5" fill="#b8e994" opacity="0.5"/>
+    <path d="M13 21 Q14.5 22.5 16 20.5 Q17.5 22.5 19 21" stroke="#5a4a3a" stroke-width="0.9" stroke-linecap="round" fill="none"/>
+  `,
+
+  // Jijik + Terkejut → shocked disgust
+  disgusted_surprised: `
+    <!-- Kaget jijik: alis satu naik satu turun, mata satu besar satu sipit, mulut lebar jijik -->
+    <path d="M10 10 Q12 8 14 10" stroke="#5a4a3a" stroke-width="0.8" stroke-linecap="round" fill="none"/>
+    <path d="M18 12.5 Q20 11 22 12.5" stroke="#5a4a3a" stroke-width="0.9" stroke-linecap="round" fill="none"/>
+    <g class="mascot-blink-group">
+      <ellipse cx="12" cy="15.5" rx="3" ry="3.5" fill="#fff" stroke="#1a1a2e" stroke-width="0.5"/>
+      <ellipse cx="20" cy="15.5" rx="2.3" ry="2.5" fill="#fff" stroke="#1a1a2e" stroke-width="0.5"/>
+      <g class="mascot-pupils">
+        <circle cx="12" cy="16" r="1.3" fill="#1a1a2e"/>
+        <circle cx="20" cy="16.2" r="0.8" fill="#1a1a2e"/>
+      </g>
+    </g>
+    <circle cx="22" cy="18" r="1.5" fill="#b8e994" opacity="0.5"/>
+    <ellipse cx="16" cy="22" rx="2" ry="1.8" fill="#1a1a2e"/>
+    <path d="M15 22 Q16 21 17 22" fill="#b8e994" opacity="0.4"/>
+  `,
+
+  // Marah + Sedih → marah terpukul
+  angry_sad: `
+    <!-- Marah terpukul: alis V tapi bergetar sedih, mata basah + tajam, mulut cemberut -->
+    <path d="M10 12 Q12 10.5 14 11.5" stroke="#5a4a3a" stroke-width="1.0" stroke-linecap="round" fill="none"/>
+    <path d="M18 11.5 Q20 10.5 22 12" stroke="#5a4a3a" stroke-width="1.0" stroke-linecap="round" fill="none"/>
+    <g class="mascot-blink-group">
+      <ellipse cx="12" cy="16" rx="2.8" ry="3" fill="#fff" stroke="#1a1a2e" stroke-width="0.5"/>
+      <ellipse cx="20" cy="16" rx="2.8" ry="3" fill="#fff" stroke="#1a1a2e" stroke-width="0.5"/>
+      <g class="mascot-pupils">
+        <circle cx="12" cy="16.5" r="1.1" fill="#1a1a2e"/>
+        <circle cx="20" cy="16.5" r="1.1" fill="#1a1a2e"/>
+      </g>
+    </g>
+    <ellipse cx="14.8" cy="19" rx="0.6" ry="1.2" fill="#5b9de9" opacity="0.7">
+      <animate attributeName="cy" values="19;21.5;19" dur="1.6s" repeatCount="indefinite"/>
+    </ellipse>
+    <g opacity="0.5">
+      <path d="M7 9 L8.5 10 L7.5 10.5 L9 11.5" stroke="#e74c3c" stroke-width="0.7" fill="none" stroke-linecap="round"/>
+    </g>
+    <path d="M13.5 22.5 Q16 20 18.5 22.5" stroke="#5a4a3a" stroke-width="1.0" stroke-linecap="round" fill="none"/>
+  `,
+
+  // Marah + Penghinaan → sinis (contempt)
+  cynical: `
+    <!-- Sinis: satu alis naik, satu mata menyipit tajam, senyum miring sinis -->
+    <path d="M10 12 Q12 11 14 12" stroke="#5a4a3a" stroke-width="0.9" stroke-linecap="round" fill="none"/>
+    <path d="M18 11 Q20 10 22 11" stroke="#5a4a3a" stroke-width="0.8" stroke-linecap="round" fill="none"/>
+    <g class="mascot-blink-group">
+      <ellipse cx="12" cy="16" rx="2.3" ry="2.5" fill="#fff" stroke="#1a1a2e" stroke-width="0.5"/>
+      <ellipse cx="20" cy="15" rx="2.8" ry="3.2" fill="#fff" stroke="#1a1a2e" stroke-width="0.5"/>
+      <g class="mascot-pupils">
+        <circle cx="12" cy="16.5" r="1" fill="#1a1a2e"/>
+        <circle cx="20" cy="15.5" r="1.2" fill="#1a1a2e"/>
+        <circle cx="20" cy="15" r="0.4" fill="#c0392b" opacity="0.6"/>
+      </g>
+    </g>
+    <path d="M14 21 L18.5 20" stroke="#5a4a3a" stroke-width="0.9" stroke-linecap="round" fill="none"/>
+  `,
+
+  // Terkejut + Bahagia → shocked happy
+  surprised_happy: `
+    <!-- Kaget senang: alis tinggi, mata bersinar besar, mulut senyum lebar O -->
+    <path d="M9.5 9 Q12 7 14.5 9" stroke="#5a4a3a" stroke-width="0.8" stroke-linecap="round" fill="none"/>
+    <path d="M17.5 9 Q20 7 22.5 9" stroke="#5a4a3a" stroke-width="0.8" stroke-linecap="round" fill="none"/>
+    <g class="mascot-blink-group">
+      <ellipse cx="12" cy="15.5" rx="3" ry="3.5" fill="#fff" stroke="#1a1a2e" stroke-width="0.5"/>
+      <ellipse cx="20" cy="15.5" rx="3" ry="3.5" fill="#fff" stroke="#1a1a2e" stroke-width="0.5"/>
+      <g class="mascot-pupils">
+        <circle cx="12" cy="15.5" r="1.5" fill="#1a1a2e"/>
+        <circle cx="20" cy="15.5" r="1.5" fill="#1a1a2e"/>
+        <circle cx="12.5" cy="14.8" r="0.6" fill="#fff" opacity="0.9"/>
+        <circle cx="20.5" cy="14.8" r="0.6" fill="#fff" opacity="0.9"/>
+      </g>
+    </g>
+    <circle cx="9" cy="18.5" r="2" fill="#ffb3ba" opacity="0.7"/>
+    <circle cx="23" cy="18.5" r="2" fill="#ffb3ba" opacity="0.7"/>
+    <path d="M13 20 Q16 24.5 19 20" fill="none" stroke="#5a4a3a" stroke-width="1.1" stroke-linecap="round"/>
+  `,
+
+  // Terkejut + Marah → tersentak marah
+  surprised_angry: `
+    <!-- Kaget marah: alis V + tinggi, mata melotot merah, mulut terbuka teriak -->
+    <path d="M9.5 11.5 Q12 9.5 14 10.5" stroke="#5a4a3a" stroke-width="1.0" stroke-linecap="round" fill="none"/>
+    <path d="M18 10.5 Q20 9.5 22.5 11.5" stroke="#5a4a3a" stroke-width="1.0" stroke-linecap="round" fill="none"/>
+    <g class="mascot-blink-group">
+      <ellipse cx="12" cy="16" rx="3" ry="3.2" fill="#fff" stroke="#1a1a2e" stroke-width="0.6"/>
+      <ellipse cx="20" cy="16" rx="3" ry="3.2" fill="#fff" stroke="#1a1a2e" stroke-width="0.6"/>
+      <g class="mascot-pupils">
+        <circle cx="12" cy="16" r="1.5" fill="#1a1a2e"/>
+        <circle cx="20" cy="16" r="1.5" fill="#1a1a2e"/>
+        <circle cx="12" cy="15.5" r="0.6" fill="#c0392b"/>
+        <circle cx="20" cy="15.5" r="0.6" fill="#c0392b"/>
+      </g>
+    </g>
+    <g opacity="0.9">
+      <path d="M6.5 8 L8 9 L7 9.5 L8.5 10.5" stroke="#e74c3c" stroke-width="1" fill="none" stroke-linecap="round"/>
+      <path d="M25.5 8 L24 9 L25 9.5 L23.5 10.5" stroke="#e74c3c" stroke-width="1" fill="none" stroke-linecap="round"/>
+    </g>
+    <path d="M13 20 Q16 25 19 20 Z" fill="#1a1a2e"/>
+  `,
+
+  // Terkejut + Takut → flinch
+  surprised_scared: `
+    <!-- Flinch: alis sangat tinggi mengerut, mata super besar, mulut zigzag bergetar, keringat banyak -->
+    <path d="M9 8 Q12 5.5 15 8" stroke="#5a4a3a" stroke-width="1.0" stroke-linecap="round" fill="none"/>
+    <path d="M17 8 Q20 5.5 23 8" stroke="#5a4a3a" stroke-width="1.0" stroke-linecap="round" fill="none"/>
+    <g class="mascot-blink-group">
+      <ellipse cx="12" cy="15" rx="3.5" ry="4.2" fill="#fff" stroke="#1a1a2e" stroke-width="0.6"/>
+      <ellipse cx="20" cy="15" rx="3.5" ry="4.2" fill="#fff" stroke="#1a1a2e" stroke-width="0.6"/>
+      <g class="mascot-pupils">
+        <circle cx="12" cy="16" r="0.7" fill="#1a1a2e"/>
+        <circle cx="20" cy="16" r="0.7" fill="#1a1a2e"/>
+      </g>
+    </g>
+    <ellipse cx="6.5" cy="12" rx="0.6" ry="1.5" fill="#5b9de9" opacity="0.8">
+      <animate attributeName="cy" values="12;17;12" dur="1s" repeatCount="indefinite"/>
+    </ellipse>
+    <ellipse cx="25.5" cy="13" rx="0.6" ry="1.5" fill="#5b9de9" opacity="0.7">
+      <animate attributeName="cy" values="13;18;13" dur="1.2s" repeatCount="indefinite"/>
+    </ellipse>
+    <path d="M12.5 22 L14 21 L15.5 22.5 L17 21 L18.5 22.5 L19.5 21.5" stroke="#5a4a3a" stroke-width="0.8" stroke-linecap="round" fill="none">
+      <animate attributeName="d" values="M12.5 22 L14 21 L15.5 22.5 L17 21 L18.5 22.5 L19.5 21.5;M12.5 21.5 L14 21.5 L15.5 22 L17 21.5 L18.5 22 L19.5 21.5;M12.5 22 L14 21 L15.5 22.5 L17 21 L18.5 22.5 L19.5 21.5" dur="0.4s" repeatCount="indefinite"/>
+    </path>
+  `,
+
+};
+
+// --- Quotes Dictionary ---
+const MASCOT_QUOTES = {
+  surplus: [
+    { face: 'happy_surprised', text: 'ASTAGA! Kas menggila, Boss!!' },
+    { face: 'laugh', text: 'Kas makin tebal, Boss!' },
+    { face: 'happy', text: 'Asik, uang masuk terus!' },
+    { face: 'laugh', text: 'Hahaha! Moni-moni makin jaya!' },
+    { face: 'surprised_happy', text: 'WOW! Gak nyangka! Surplus besar!' },
+    { face: 'happy', text: 'Beli cilok ah pakai duit sisa!' },
+    { face: 'neutral', text: 'Laporan kas aman terkendali!' },
+    { face: 'laugh', text: 'Wuhuu! Cuann terooss~' },
+    { face: 'happy', text: 'Mantap jiwa, surplus terus!' },
+    { face: 'laugh', text: 'Dompet senyum lebar, Boss!' },
+    { face: 'happy_surprised', text: 'Tajir melintir Boss!! WOW!!' },
+  ],
+  deficit: [
+    { face: 'sad_surprised', text: 'HAH?! K-kok minus...!?' },
+    { face: 'sad', text: 'Waduh, tekor kita Boss...' },
+    { face: 'angry', text: 'Bocor! Pengeluaran ngeri amat!' },
+    { face: 'sad_scared', text: 'A-aku takut cek saldo....' },
+    { face: 'sad_angry', text: 'Nangis aku tapi KESAL!' },
+    { face: 'angry_surprised', text: 'APA?! Siapa belanja segini?!' },
+    { face: 'sad', text: 'Puasa dulu ya kita bulan ini...' },
+    { face: 'angry', text: 'HEH! Tolong rem belanjanya!' },
+    { face: 'angry_disgusted', text: 'Ihh jijik lihat angka minus!' },
+    { face: 'sad', text: 'Minus terus nih... sedih.' },
+    { face: 'angry_sad', text: 'KESEL tapi sedih juga...' },
+    { face: 'scared', text: 'G-gawat... kasnya menipis!' },
+    { face: 'sad_disgusted', text: 'Mual aku lihat defisit ini...' },
+    { face: 'angry', text: 'Siapa yang belanja lagi?!' },
+    { face: 'sad', text: 'Makan mie instan aja deh...' },
+  ],
+  zero: [
+    { face: 'happy', text: 'Halooo~ Aku Moni-Moni! Penjaga harta kerajaanmu~' },
+    { face: 'neutral', text: 'Hai Boss! Sini-sini, biar aku pantau kasnya!' },
+    { face: 'surprised', text: 'OH! Belum ada transaksi?! Ayo mulai!' },
+    { face: 'happy', text: 'Moni-Moni siap jaga kas Boss hari ini!' },
+    { face: 'neutral', text: 'Belum ada transaksi nih~ Ayo Boss semangat!' },
+    { face: 'laugh', text: 'Hehe~ Aku Moni-Moni, si mahkota paling kece!' },
+    { face: 'cynical', text: 'Hmm... kasnya masih nol ya Boss...' },
+    { face: 'happy', text: 'Hari baru, rejeki baru! Semangat Boss!' },
+    { face: 'surprised_happy', text: 'Boss datang! Yay~ Aku kangen!' },
+  ]
+};
+
+// --- Poke reactions (separate from financial mood) ---
+const POKE_REACTIONS = [
+  { face: 'tickled', text: 'GYAHAHAHA! Stop Boss!!', sound: 'boing' },
+  { face: 'tickled', text: 'ADUUUH! Geliiii!! Hahahaha', sound: 'boing' },
+  { face: 'laugh', text: 'Ehehe~ sekali lagi dong!', sound: 'pop' },
+  { face: 'tickled', text: 'WKWKWK! Ampuun Boss!!', sound: 'boing' },
+  { face: 'angry', text: 'Ih kok di-poke! Sebell!', sound: 'error' },
+  { face: 'happy', text: 'Hehe~ kena deh!', sound: 'pop' },
+  { face: 'surprised', text: 'HUWAA! Kaget!!', sound: 'boing' },
+  { face: 'angry_surprised', text: 'HAH?! APA-APAAN?!', sound: 'error' },
+  { face: 'scared', text: 'H-hiii! Jangan tiba-tiba!', sound: 'boing' },
+  { face: 'tickled', text: 'ASTAGA GELINYA PARAH!!', sound: 'boing' },
+  { face: 'surprised_happy', text: 'OH! Hai Boss~ hehe!', sound: 'pop' },
+  { face: 'laugh', text: 'Awas ya Boss, tak balas!', sound: 'pop' },
+  { face: 'angry', text: 'JANGAN SENTUH MAHKOTAKU!', sound: 'error' },
+  { face: 'cynical', text: 'Hmm... iseng ya, Boss?', sound: 'pop' },
+  { face: 'scared_surprised', text: 'ASTAGA!! JANTUNGKU!!', sound: 'boing' },
+  { face: 'disgusted', text: 'Iiih... tangan Boss bau!', sound: 'error' },
+  { face: 'happy_disgusted', text: 'Ehh... geli tapi lucu~', sound: 'pop' },
+  { face: 'tickled', text: 'TOLOONG! WKWKWK!', sound: 'boing' },
+  { face: 'happy', text: 'Boss lagi gabut ya?', sound: 'pop' },
+  { face: 'surprised_scared', text: 'UWAAA!! AMPUN BOSS!!', sound: 'boing' },
+  { face: 'laugh', text: 'Hihihi~ sini aku gigit!', sound: 'boing' },
+];
+
+let mascotInterval = null;
+let mascotBlinkTimeout = null;
+let lastPokeIdx = -1;
+
+// --- Blink engine (independent of face changes) ---
+const triggerBlink = () => {
+  const blinkGroups = document.querySelectorAll('#interactiveMascotFace .mascot-blink-group');
+  blinkGroups.forEach(g => {
+    g.style.transition = 'transform 0.08s';
+    g.style.transformOrigin = 'center 16px';
+    g.style.transform = 'scaleY(0.08)';
+    setTimeout(() => {
+      g.style.transform = 'scaleY(1)';
+      // Double blink 30% of the time
+      if (Math.random() < 0.3) {
+        setTimeout(() => {
+          g.style.transform = 'scaleY(0.08)';
+          setTimeout(() => { g.style.transform = 'scaleY(1)'; }, 80);
+        }, 180);
+      }
+    }, 100);
+  });
+};
+
+const startBlinking = () => {
+  if (mascotBlinkTimeout) clearTimeout(mascotBlinkTimeout);
+  const scheduleBlink = () => {
+    const delay = 2000 + Math.random() * 2000;
+    mascotBlinkTimeout = setTimeout(() => {
+      triggerBlink();
+      scheduleBlink();
+    }, delay);
+  };
+  scheduleBlink();
+};
+
+// --- Pupil follow mouse ---
+const initPupilTracking = () => {
+  document.addEventListener('mousemove', (e) => {
+    const svg = document.getElementById('interactiveMascotSvg');
+    if (!svg) return;
+    const rect = svg.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const dx = (e.clientX - cx) / (window.innerWidth / 2);
+    const dy = (e.clientY - cy) / (window.innerHeight / 2);
+    const maxShift = 1.5;
+    const shiftX = Math.max(-maxShift, Math.min(maxShift, dx * maxShift));
+    const shiftY = Math.max(-maxShift, Math.min(maxShift, dy * 1));
+    
+    const pupils = document.querySelectorAll('#interactiveMascotFace .mascot-pupils');
+    pupils.forEach(p => {
+      p.style.transform = `translate(${shiftX}px, ${shiftY}px)`;
+      p.style.transition = 'transform 0.15s ease-out';
+    });
+  });
+};
+
+// --- Main mascot update loop ---
+const startInteractiveMascot = () => {
+  if (mascotInterval) clearInterval(mascotInterval);
+  
+  const updateMascot = () => {
+    const totalIn = state.transactions.filter(t => t.type === 'income').reduce((sum, tx) => sum + tx.amount, 0);
+    const totalOut = state.transactions.filter(t => t.type === 'expense').reduce((sum, tx) => sum + tx.amount, 0);
+    const netFlow = totalIn - totalOut;
+
+    let condition = 'zero';
+    if (netFlow > 0) condition = 'surplus';
+    else if (netFlow < 0) condition = 'deficit';
+
+    const quotes = MASCOT_QUOTES[condition];
+    const randomQuote = quotes[Math.floor(Math.random() * quotes.length)];
+    
+    const faceEl = $('interactiveMascotFace');
+    const textEl = $('interactiveMascotText');
+    
+    if (faceEl && textEl) {
+      faceEl.innerHTML = MASCOT_FACES[randomQuote.face];
+      
+      textEl.style.transition = 'opacity 0.25s, transform 0.25s';
+      textEl.style.opacity = '0';
+      textEl.style.transform = 'translateY(4px)';
+      
+      setTimeout(() => {
+        textEl.textContent = randomQuote.text;
+        textEl.style.opacity = '1';
+        textEl.style.transform = 'translateY(0)';
+      }, 250);
+    }
+  };
+
+  updateMascot();
+  mascotInterval = setInterval(updateMascot, 6000);
+};
+
+// --- Poke / Tickle handler ---
+window.pokeMascot = () => {
+  const faceEl = $('interactiveMascotFace');
+  const textEl = $('interactiveMascotText');
+  const svgEl = document.getElementById('interactiveMascotSvg');
+  if (!faceEl || !textEl) return;
+
+  // Pick a random poke reaction (avoid repeating last one)
+  let idx;
+  do { idx = Math.floor(Math.random() * POKE_REACTIONS.length); } while (idx === lastPokeIdx && POKE_REACTIONS.length > 1);
+  lastPokeIdx = idx;
+  const reaction = POKE_REACTIONS[idx];
+
+  // Play reaction sound
+  if (typeof playSound === 'function') playSound(reaction.sound);
+
+  // Quick squish animation on the SVG
+  if (svgEl) {
+    svgEl.style.transition = 'transform 0.1s cubic-bezier(0.68, -0.55, 0.27, 1.55)';
+    svgEl.style.transform = 'scale(0.8) rotate(-10deg)';
+    setTimeout(() => {
+      svgEl.style.transform = 'scale(1.15) rotate(5deg)';
+      setTimeout(() => {
+        svgEl.style.transition = 'transform 0.3s ease';
+        svgEl.style.transform = '';
+      }, 150);
+    }, 120);
+  }
+
+  // Change face
+  faceEl.innerHTML = MASCOT_FACES[reaction.face];
+
+  // Animate text swap (fast pop)
+  textEl.style.transition = 'opacity 0.08s, transform 0.15s cubic-bezier(0.68, -0.55, 0.27, 1.55)';
+  textEl.style.opacity = '0';
+  textEl.style.transform = 'translateY(-3px) scale(0.95)';
+  setTimeout(() => {
+    textEl.textContent = reaction.text;
+    textEl.style.opacity = '1';
+    textEl.style.transform = 'translateY(0) scale(1)';
+  }, 80);
+
+  // Resume normal cycle after 2.5 seconds
+  if (mascotInterval) clearInterval(mascotInterval);
+  setTimeout(() => {
+    startInteractiveMascot();
+  }, 2500);
+};
+
+// --- Bootstrap ---
+const originalInit = typeof init === 'function' ? init : () => {};
+window.init = async () => {
+  await originalInit();
+  startInteractiveMascot();
+  startBlinking();
+  initPupilTracking();
+};
+if (typeof init === 'function') {
+  init();
+}
+
+/* ============================================
+   NERACA KERAJAAN LUDO — AI MASCOT (Vanilla JS)
+   ============================================ */
+
+class AiMascotService {
+  constructor() {
+    this.geminiBaseURL = 'https://generativelanguage.googleapis.com/v1beta';
+    this.geminiModel = 'gemini-1.5-flash';
+    this.groqBaseURL = 'https://api.groq.com/openai/v1/chat/completions';
+    this.groqModel = 'llama3-8b-8192';
+  }
+
+  getApiKey(type) {
+    return sessionStorage.getItem(type + '_api_key') || '';
+  }
+
+  async getGeminiResponse(prompt) {
+    const key = this.getApiKey('gemini');
+    if (!key) throw new Error("Gemini API Key hilang.");
+    
+    // Konteks ringkas untuk Mascot
+    const systemPrompt = `Kamu adalah Moni-moni, maskot keuangan virtual berwujud mahkota emas kecil. 
+Jawablah pertanyaan user mengenai uang/keuangan/kas dengan gaya bahasa santai, lucu, layaknya "Bos" dan ajudan. Hindari format markdown yang rumit.
+Berikan respon maksimal 2 atau 3 kalimat singkat yang asik.
+Pertanyaan User: ${prompt}`;
+
+    const url = `${this.geminiBaseURL}/models/${this.geminiModel}:generateContent?key=${key}`;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: systemPrompt }] }]
+      })
+    });
+
+    if (!response.ok) throw new Error(`Gemini Error: ${response.status}`);
+    const data = await response.json();
+    return data.candidates[0].content.parts[0].text;
+  }
+
+  async getGroqResponse(prompt) {
+    const key = this.getApiKey('groq');
+    if (!key) throw new Error("Groq API Key hilang.");
+
+    const systemPrompt = `Kamu adalah Moni-moni, maskot keuangan virtual bergaya bos namun lucu. Jawab seputar uang, jujur tapi asik. Maksimal 2 kalimat singkat.\\nUser: ${prompt}`;
+
+    const response = await fetch(this.groqBaseURL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${key}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: this.groqModel,
+        messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: prompt }]
+      })
+    });
+
+    if (!response.ok) throw new Error(`Groq Error: ${response.status}`);
+    const data = await response.json();
+    return data.choices[0].message.content;
+  }
+
+  getOfflineRulesResponse(prompt) {
+    console.info("Maskot Mode: Offline Safety Net Aktif");
+    const p = prompt.toLowerCase();
+    
+    if (p.includes('uang') || p.includes('saldo') || p.includes('kaya')) {
+      return "Sistem AI ku sedang mati. Tapi ingat, kalau mau kaya, pengeluaran harus lebih kecil dari pemasukan!";
+    }
+    if (p.includes('halo') || p.includes('hai')) {
+      return "Hai Bos! Meskipun otak awanku sedang offline, aku tetap setia mencatat kasmu!";
+    }
+    
+    return "Hm... pengaturan AI di pojok kanan atas belum kamu isi ya? Otakku terbatas nih kalau offline.";
+  }
+
+  async askMascot(prompt) {
+    const hasGemini = !!this.getApiKey('gemini');
+    const hasGroq = !!this.getApiKey('groq');
+
+    if (!hasGemini && !hasGroq) {
+      return this.getOfflineRulesResponse(prompt);
+    }
+
+    try {
+      if (hasGemini) {
+        console.log("[Cascade] Mencoba Primary API: Gemini Flash...");
+        return await this.getGeminiResponse(prompt);
+      } else {
+        throw new Error("Skip Gemini");
+      }
+    } catch (geminiError) {
+      console.warn("Primary API Gagal / Kosong:", geminiError.message);
+      try {
+        if (hasGroq) {
+          console.log("[Cascade] Beralih ke Fallback API: Groq...");
+          return await this.getGroqResponse(prompt);
+        } else {
+          throw new Error("Skip Groq");
+        }
+      } catch (groqError) {
+        console.error("Fallback API Gagal / Kosong:", groqError.message);
+        return this.getOfflineRulesResponse(prompt);
+      }
+    }
+  }
+}
+
+const aiMascot = new AiMascotService();
+
+// --- UI Handlers for AI ---
+
+window.saveAiSettings = () => {
+    const gem = document.getElementById('geminiApiKey').value.trim();
+    const grq = document.getElementById('groqApiKey').value.trim();
+    
+    if (gem) sessionStorage.setItem('gemini_api_key', gem);
+    else sessionStorage.removeItem('gemini_api_key');
+    
+    if (grq) sessionStorage.setItem('groq_api_key', grq);
+    else sessionStorage.removeItem('groq_api_key');
+    
+    if (typeof closeModal === 'function') closeModal('aiSettingsModal');
+    
+    if (gem || grq) {
+        if (typeof showToast === 'function') showToast('Otak AI Mascot berhasil diaktifkan!', 'success');
+        setMascotSpeech("Wah, pemikiranku jadi cepat sekali sekarang! Ada yang mau ditanyakan?", false, 'interactiveMascotText');
+    } else {
+        if (typeof showToast === 'function') showToast('API Key dikosongkan. Maskot berjalan di Mode Offline.', 'warning');
+    }
+};
+
+window.sendChatMascot = async () => {
+    const input = document.getElementById('mascotChatInput');
+    const textEl = document.getElementById('interactiveMascotText');
+    const svgEl = document.getElementById('interactiveMascotSvg');
+    
+    if (!input || !textEl) return;
+    const prompt = input.value.trim();
+    if (!prompt) return;
+    
+    // Clear input
+    input.value = '';
+    
+    // Stop normal interval while chatting
+    if (typeof mascotInterval !== 'undefined' && mascotInterval) {
+        clearInterval(mascotInterval);
+    }
+    
+    // Set loading state
+    setMascotSpeech("Sedang mikir keras...", true, 'interactiveMascotText');
+    textEl.style.opacity = '0.5';
+    
+    try {
+        const answer = await aiMascot.askMascot(prompt);
+        textEl.style.opacity = '1';
+        setMascotSpeech(answer, false, 'interactiveMascotText');
+        
+        // Quick bounce
+        if (svgEl) {
+            svgEl.style.transition = 'transform 0.2s';
+            svgEl.style.transform = 'translateY(-10px)';
+            setTimeout(() => { svgEl.style.transform = 'translateY(0)'; }, 200);
+        }
+        
+    } catch (e) {
+        textEl.style.opacity = '1';
+        setMascotSpeech("Aduh, koneksiku terputus!", false, 'interactiveMascotText');
+    } finally {
+        // Resume normal interval after 15 seconds
+        setTimeout(() => {
+            if (typeof startInteractiveMascot === 'function') {
+                startInteractiveMascot();
+            }
+        }, 15000);
+    }
+};
+
+// Prepopulate inputs if session exists
+document.addEventListener('DOMContentLoaded', () => {
+    const gKey = sessionStorage.getItem('gemini_api_key');
+    const qKey = sessionStorage.getItem('groq_api_key');
+    if (gKey && document.getElementById('geminiApiKey')) document.getElementById('geminiApiKey').value = gKey;
+    if (qKey && document.getElementById('groqApiKey')) document.getElementById('groqApiKey').value = qKey;
+});

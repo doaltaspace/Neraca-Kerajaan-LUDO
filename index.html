@@ -32,37 +32,66 @@
 
     <!-- ========== LOGIN SCREEN ========== -->
     <div id="loginScreen" class="full-screen-overlay" style="display: none;">
+        <!-- Floating sparkle particles -->
+        <div class="login-sparkles" id="loginSparkles">
+            <span class="sparkle s1">✦</span>
+            <span class="sparkle s2">✧</span>
+            <span class="sparkle s3">★</span>
+            <span class="sparkle s4">✦</span>
+            <span class="sparkle s5">✧</span>
+            <span class="sparkle s6">★</span>
+            <span class="sparkle s7">✦</span>
+            <span class="sparkle s8">✧</span>
+        </div>
+
         <div class="login-card">
             <div class="login-header">
-                <svg id="loginMascot" class="crown-icon mascot" viewBox="0 0 32 32" fill="none"
-                    style="transition: transform 0.3s ease;">
-                    <path class="crown-body" d="M4 24h24v3H4z" fill="currentColor" rx="1.5" />
-                    <path class="crown-body" d="M4 24L2 10l8 6 6-10 6 10 8-6-2 14z" fill="currentColor"
-                        opacity="0.85" />
-                    <circle cx="8" cy="10.5" r="1.8" fill="currentColor" />
-                    <circle cx="16" cy="5.5" r="1.8" fill="currentColor" />
-                    <circle cx="24" cy="10.5" r="1.8" fill="currentColor" />
+                <!-- ===== BIG INTERACTIVE MASCOT ===== -->
+                <div class="login-mascot-stage" id="loginMascotStage">
+                    <svg id="loginMascot" class="login-mascot-svg" viewBox="0 0 64 64" fill="none">
+                        <!-- Shadow under mascot -->
+                        <ellipse cx="32" cy="60" rx="18" ry="3" fill="rgba(26,26,46,0.12)">
+                            <animate attributeName="rx" values="18;15;18" dur="3s" repeatCount="indefinite" />
+                        </ellipse>
 
-                    <!-- Open Eyes -->
-                    <g id="mascotEyesOpen">
-                        <ellipse cx="12" cy="17" rx="2.5" ry="3.5" fill="#fff" />
-                        <ellipse cx="20" cy="17" rx="2.5" ry="3.5" fill="#fff" />
-                        <circle id="mascotPupilL" cx="12" cy="17" r="1.2" fill="#1a1a2e"
-                            style="transition: all 0.1s ease;" />
-                        <circle id="mascotPupilR" cx="20" cy="17" r="1.2" fill="#1a1a2e"
-                            style="transition: all 0.1s ease;" />
-                    </g>
+                        <!-- Crown Body -->
+                        <path d="M8 48h48v5H8z" fill="#f6a723" rx="2.5" />
+                        <path d="M8 48L4 20l16 12 12-20 12 20 16-12-4 28z" fill="#f6a723" opacity="0.9" />
+                        <!-- Crown Jewels (tips) -->
+                        <circle cx="16" cy="21" r="3.2" fill="#f6a723" />
+                        <circle cx="32" cy="11" r="3.2" fill="#f6a723" />
+                        <circle cx="48" cy="21" r="3.2" fill="#f6a723" />
+                        <!-- Jewel sparkle dots -->
+                        <circle cx="16" cy="21" r="1.2" fill="#fff" opacity="0.6">
+                            <animate attributeName="opacity" values="0.6;1;0.6" dur="2s" repeatCount="indefinite" />
+                        </circle>
+                        <circle cx="32" cy="11" r="1.2" fill="#fff" opacity="0.6">
+                            <animate attributeName="opacity" values="0.6;1;0.6" dur="2s" begin="0.5s"
+                                repeatCount="indefinite" />
+                        </circle>
+                        <circle cx="48" cy="21" r="1.2" fill="#fff" opacity="0.6">
+                            <animate attributeName="opacity" values="0.6;1;0.6" dur="2s" begin="1s"
+                                repeatCount="indefinite" />
+                        </circle>
 
-                    <!-- Closed Eyes (Hidden initially) -->
-                    <g id="mascotEyesClosed" style="display: none;">
-                        <path d="M10 17 Q12 15 14 17" stroke="#3d2f12" stroke-width="1.5" stroke-linecap="round"
-                            fill="none" />
-                        <path d="M18 17 Q20 15 22 17" stroke="#3d2f12" stroke-width="1.5" stroke-linecap="round"
-                            fill="none" />
-                        <path d="M12 18 Q16 21 20 18" stroke="#3d2f12" stroke-width="1.5" stroke-linecap="round"
-                            fill="none" /> <!-- Blush/Mouth -->
-                    </g>
-                </svg>
+                        <!-- Band detail -->
+                        <rect x="10" y="48" width="44" height="5" rx="2" fill="#e8941e" />
+                        <circle cx="20" cy="50.5" r="1.5" fill="#ef4444" opacity="0.7" />
+                        <circle cx="32" cy="50.5" r="1.5" fill="#3b82f6" opacity="0.7" />
+                        <circle cx="44" cy="50.5" r="1.5" fill="#22c55e" opacity="0.7" />
+
+                        <!-- ===== DYNAMIC FACE (injected by JS from MASCOT_FACES) ===== -->
+                        <g id="loginMascotFace" transform="translate(0, 3) scale(2)">
+                            <!-- JS will inject face SVG here -->
+                        </g>
+                    </svg>
+
+                    <!-- Speech bubble -->
+                    <div class="mascot-speech-login" id="mascotSpeechLogin">
+                        <span id="mascotSpeechText">Hai Boss! Ayo masuk ke kerajaanmu!</span>
+                    </div>
+                </div>
+
                 <h2>Gerbang Utama</h2>
                 <p>Silakan masuk ke Neraca Kerajaan LUDO</p>
             </div>
@@ -115,7 +144,8 @@
                     </a>
 
                     <div class="nav-links" id="navLinks">
-                        <a href="#" class="nav-link active" data-page="dashboard" onclick="navigatePage('dashboard')">Dashboard</a>
+                        <a href="#" class="nav-link active" data-page="dashboard"
+                            onclick="navigatePage('dashboard')">Dashboard</a>
                         <a href="#" class="nav-link" data-page="ledger" onclick="navigatePage('ledger')">Buku Besar</a>
                         <a href="#" class="nav-link" data-page="goals" onclick="navigatePage('goals')">Tujuan</a>
                     </div>
@@ -144,6 +174,19 @@
                             <path d="M13.73 21a2 2 0 0 1-3.46 0" />
                         </svg>
                         <span class="badge hidden" id="notifBadge">0</span>
+                    </button>
+
+                    <!-- AI Settings -->
+                    <button class="nav-icon-btn" id="aiSettingsBtn" aria-label="Pengaturan AI"
+                        onclick="openModal('aiSettingsModal')">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="11" width="18" height="10" rx="2" />
+                            <circle cx="12" cy="5" r="2" />
+                            <path d="M12 7v4" />
+                            <line x1="8" y1="16" x2="8" y2="16" />
+                            <line x1="16" y1="16" x2="16" y2="16" />
+                        </svg>
                     </button>
 
                     <!-- Profile -->
@@ -671,75 +714,104 @@
         <main class="ledger page-view" id="pageLedger" style="display:none;">
             <div class="container">
                 <div class="ledger-v2" style="max-width: 900px; margin-left: auto; margin-right: auto;">
-                    
+
                     <!-- Header Row (outside scroll) -->
                     <div class="ledger-v2-header">
-                        <div class="ledger-v2-title" style="display: flex; align-items: center; gap: 18px;">
-                            <svg class="mascot-neutral-svg" viewBox="0 0 32 32" width="60" height="60" fill="none" style="filter: drop-shadow(3px 3px 0 rgba(26,26,46,0.3));">
-                                <path d="M4 24h24v3H4z" fill="#f6a723" rx="1.5" />
-                                <path d="M4 24L2 10l8 6 6-10 6 10 8-6-2 14z" fill="#f6a723" opacity="0.85" />
-                                <circle cx="8" cy="10.5" r="1.8" fill="#f6a723" />
-                                <circle cx="16" cy="5.5" r="1.8" fill="#f6a723" />
-                                <circle cx="24" cy="10.5" r="1.8" fill="#f6a723" />
-                                <g style="transform-origin: center 16px; animation: blink 4s infinite 2s;">
-                                  <ellipse cx="12" cy="16" rx="2.5" ry="3.5" fill="#fff" />
-                                  <ellipse cx="20" cy="16" rx="2.5" ry="3.5" fill="#fff" />
-                                  <circle cx="12" cy="16" r="1.2" fill="#1a1a2e" />
-                                  <circle cx="20" cy="16" r="1.2" fill="#1a1a2e" />
-                                </g>
-                                <line x1="14" y1="21" x2="18" y2="21" stroke="#1a1a2e" stroke-width="1.5" stroke-linecap="round" />
-                            </svg>
-                            <div style="position: relative; background: #fff; border: 3px solid #1a1a2e; border-radius: 12px; padding: 10px 16px; box-shadow: 4px 4px 0 #1a1a2e; min-width: 140px;">
-                                <div style="font-weight: 900; font-size: 1.15rem; color: #1a1a2e; text-transform: uppercase; letter-spacing: 0.05em; line-height: 1.2;">LUDO LEDGER</div>
-                                <div style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); font-style: italic; margin-top: 2px;">Siap pantau kas, Boss!👑</div>
-                                <!-- Speech bubble pointer (Outer Stroke) -->
-                                <div style="position: absolute; left: -11px; top: 50%; transform: translateY(-50%); width: 0; height: 0; border-top: 8px solid transparent; border-bottom: 8px solid transparent; border-right: 8px solid #1a1a2e;"></div>
-                                <!-- Speech bubble pointer (Inner Fill) -->
-                                <div style="position: absolute; left: -5px; top: 50%; transform: translateY(-50%); width: 0; height: 0; border-top: 5px solid transparent; border-bottom: 5px solid transparent; border-right: 5px solid #fff; z-index: 2;"></div>
+                        <!-- Selisih -->
+                        <div class="summary-pill summary-net" id="summaryNetFlow">
+                            <div class="summary-pill-label">Selisih</div>
+                            <div class="summary-pill-row">
+                                <span class="summary-pill-value" id="ledgerNetFlow">Rp 0</span>
+                            </div>
+                            <div class="selisih-analysis" id="selisihAnalysis"
+                                style="font-size: 0.72rem; font-weight: 500; line-height: 1.35; margin-top: 8px; padding-top: 8px; border-top: 2px dashed rgba(26,26,46,0.1); color: #3d2f12; opacity: 0.85;">
                             </div>
                         </div>
 
-                        <!-- Summary Cards -->
-                        <div class="ledger-v2-summary">
+                        <!-- Masuk & Keluar Column -->
+                        <div class="ledger-summary-column">
                             <div class="summary-pill summary-in">
-                                <div class="summary-pill-label">TOTAL MASUK</div>
+                                <div class="summary-pill-label">Total Masuk</div>
                                 <div class="summary-pill-row">
                                     <span class="summary-pill-value" id="ledgerTotalIn">Rp 0</span>
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
                                 </div>
                             </div>
                             <div class="summary-pill summary-out">
-                                <div class="summary-pill-label">TOTAL KELUAR</div>
+                                <div class="summary-pill-label">Total Keluar</div>
                                 <div class="summary-pill-row">
                                     <span class="summary-pill-value" id="ledgerTotalOut">Rp 0</span>
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
                                 </div>
                             </div>
-                            <div class="summary-pill summary-net" id="summaryNetFlow" style="position: relative; overflow: hidden;">
-                                <div class="summary-pill-label" style="display: flex; justify-content: space-between; align-items: center;">
-                                    <span>SELISIH</span>
-                                    <span id="ledgerNetFlowMascot" style="line-height: 1; transition: transform 0.3s ease;">
-                                      <svg viewBox="0 0 32 32" width="36" height="36" fill="none" class="mascot-neutral-svg">
-                                        <path d="M4 24h24v3H4z" fill="#f6a723" rx="1.5" />
-                                        <path d="M4 24L2 10l8 6 6-10 6 10 8-6-2 14z" fill="#f6a723" opacity="0.85" />
-                                        <circle cx="8" cy="10.5" r="1.8" fill="#f6a723" />
-                                        <circle cx="16" cy="5.5" r="1.8" fill="#f6a723" />
-                                        <circle cx="24" cy="10.5" r="1.8" fill="#f6a723" />
-                                        <g style="transform-origin: center 16px; animation: blink 4s infinite 0.5s;">
-                                          <ellipse cx="12" cy="16" rx="2.5" ry="3.5" fill="#fff" />
-                                          <ellipse cx="20" cy="16" rx="2.5" ry="3.5" fill="#fff" />
-                                          <circle cx="12" cy="16" r="1.2" fill="#1a1a2e" />
-                                          <circle cx="20" cy="16" r="1.2" fill="#1a1a2e" />
+                        </div>
+
+                        <!-- Title Card / Mascot Card (Floating, Interactive) -->
+                        <div class="ledger-v2-title-card mascot-floating-container">
+                            <div class="mascot-container interactive-mascot-wrap"
+                                style="flex-shrink: 0; line-height: 0; cursor: pointer;" onclick="pokeMascot()">
+                                <svg id="interactiveMascotSvg" viewBox="0 0 32 32" width="120" height="120" fill="none"
+                                    style="filter: drop-shadow(3px 3px 0 rgba(26,26,46,0.3)); transition: transform 0.2s;">
+                                    <path d="M4 24h24v3H4z" fill="#f6a723" rx="1.5" />
+                                    <path d="M4 24L2 10l8 6 6-10 6 10 8-6-2 14z" fill="#f6a723" opacity="0.85" />
+                                    <circle cx="8" cy="10.5" r="1.8" fill="#f6a723" />
+                                    <circle cx="16" cy="5.5" r="1.8" fill="#f6a723" />
+                                    <circle cx="24" cy="10.5" r="1.8" fill="#f6a723" />
+                                    <!-- Jewel sparkle -->
+                                    <circle cx="8" cy="10.5" r="0.7" fill="#fff" opacity="0.6">
+                                        <animate attributeName="opacity" values="0.6;1;0.6" dur="2s"
+                                            repeatCount="indefinite" />
+                                    </circle>
+                                    <circle cx="16" cy="5.5" r="0.7" fill="#fff" opacity="0.6">
+                                        <animate attributeName="opacity" values="0.6;1;0.6" dur="2s" begin="0.5s"
+                                            repeatCount="indefinite" />
+                                    </circle>
+                                    <circle cx="24" cy="10.5" r="0.7" fill="#fff" opacity="0.6">
+                                        <animate attributeName="opacity" values="0.6;1;0.6" dur="2s" begin="1s"
+                                            repeatCount="indefinite" />
+                                    </circle>
+                                    <!-- Band detail -->
+                                    <rect x="5" y="24" width="22" height="3" rx="1" fill="#e8941e" />
+                                    <circle cx="10" cy="25.5" r="0.8" fill="#ef4444" opacity="0.7" />
+                                    <circle cx="16" cy="25.5" r="0.8" fill="#3b82f6" opacity="0.7" />
+                                    <circle cx="22" cy="25.5" r="0.8" fill="#22c55e" opacity="0.7" />
+                                    <!-- Dynamic face injected by JS -->
+                                    <g id="interactiveMascotFace">
+                                        <path d="M10 12.5 Q12 11 14 12" stroke="#5a4a3a" stroke-width="0.9"
+                                            stroke-linecap="round" fill="none" />
+                                        <path d="M18 12 Q20 11 22 12.5" stroke="#5a4a3a" stroke-width="0.9"
+                                            stroke-linecap="round" fill="none" />
+                                        <g class="mascot-blink-group">
+                                            <ellipse cx="12" cy="15.5" rx="2.8" ry="3" fill="#fff" stroke="#1a1a2e"
+                                                stroke-width="0.5" />
+                                            <ellipse cx="20" cy="15.5" rx="2.8" ry="3" fill="#fff" stroke="#1a1a2e"
+                                                stroke-width="0.5" />
+                                            <g class="mascot-pupils">
+                                                <circle cx="12" cy="16" r="1.1" fill="#1a1a2e" />
+                                                <circle cx="20" cy="16" r="1.1" fill="#1a1a2e" />
+                                                <circle cx="12.5" cy="15.6" r="0.4" fill="#fff" opacity="0.8" />
+                                                <circle cx="20.5" cy="15.6" r="0.4" fill="#fff" opacity="0.8" />
+                                            </g>
                                         </g>
-                                        <line x1="14" y1="21" x2="18" y2="21" stroke="#1a1a2e" stroke-width="1.5" stroke-linecap="round" />
-                                      </svg>
-                                    </span>
+                                        <path d="M14 21 Q16 22.5 18 21" fill="none" stroke="#5a4a3a" stroke-width="0.8"
+                                            stroke-linecap="round" />
+                                    </g>
+                                </svg>
+                            </div>
+                            <div class="speech-bubble-ludo" style="position: relative; overflow: visible;">
+                                <div style="cursor: pointer;" onclick="pokeMascot()">
+                                    <div class="ludo-subtitle" id="interactiveMascotText"
+                                        style="min-height: 48px; font-size: 1rem;">Halooo~ Aku Moni-Moni, penjaga harta
+                                        karunmu!</div>
                                 </div>
-                                <div class="summary-pill-row">
-                                    <span class="summary-pill-value" id="ledgerNetFlow">Rp 0</span>
-                                </div>
-                                <div id="ledgerNetFlowMsg" style="font-size: 0.75rem; font-weight: 700; margin-top: 6px; font-style: italic; opacity: 0.9;">
-                                    Menghitung koin...
+                                <div class="mascot-chat-input">
+                                    <input type="text" id="mascotChatInput" placeholder="Tanya Mascot..."
+                                        onkeypress="if(event.key === 'Enter') sendChatMascot()">
+                                    <button class="btn btn-sm btn-blue" onclick="sendChatMascot()">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                                            stroke-linecap="round" stroke-linejoin="round">
+                                            <line x1="22" y1="2" x2="11" y2="13"></line>
+                                            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                                        </svg>
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -753,16 +825,34 @@
                             <!-- Filter Pills & Count -->
                             <div class="ledger-v2-filters">
                                 <div class="ledger-v2-pills">
-                                    <button class="filter-pill active" id="filterPillPeriod" onclick="toggleLedgerPeriodFilter()">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                                    <button class="filter-pill active" id="filterPillPeriod"
+                                        onclick="toggleLedgerPeriodFilter()">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                                            stroke-linecap="round" stroke-linejoin="round">
+                                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                                            <line x1="16" y1="2" x2="16" y2="6" />
+                                            <line x1="8" y1="2" x2="8" y2="6" />
+                                            <line x1="3" y1="10" x2="21" y2="10" />
+                                        </svg>
                                         <span id="filterPeriodText">30 Hari Terakhir</span>
                                     </button>
-                                    <button class="filter-pill active" id="filterPillType" onclick="cycleLedgerTypeFilter()">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                                    <button class="filter-pill active" id="filterPillType"
+                                        onclick="cycleLedgerTypeFilter()">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                                            stroke-linecap="round" stroke-linejoin="round">
+                                            <circle cx="12" cy="12" r="3" />
+                                            <path
+                                                d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                                        </svg>
                                         <span id="filterTypeText">Semua Tipe</span>
                                     </button>
-                                    <button class="filter-pill active" id="filterPillSearch" onclick="toggleLedgerSearchBar()">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                                    <button class="filter-pill active" id="filterPillSearch"
+                                        onclick="toggleLedgerSearchBar()">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                                            stroke-linecap="round" stroke-linejoin="round">
+                                            <circle cx="11" cy="11" r="8" />
+                                            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                                        </svg>
                                         <span>Cari</span>
                                     </button>
                                 </div>
@@ -773,7 +863,8 @@
 
                             <!-- Expandable search bar -->
                             <div class="ledger-v2-search-bar hidden" id="ledgerSearchBar">
-                                <input type="text" id="filterSearch" placeholder="Cari keterangan transaksi..." oninput="renderLedger()">
+                                <input type="text" id="filterSearch" placeholder="Cari keterangan transaksi..."
+                                    oninput="renderLedger()">
                             </div>
 
                             <!-- Expandable date range -->
@@ -798,10 +889,16 @@
 
                             <!-- Column Headers -->
                             <div class="ledger-v2-col-headers">
-                                <span class="col-date col-sortable sort-desc" data-sort="date" onclick="toggleLedgerSort('date')">TANGGAL <span class="sort-arrow"></span></span>
-                                <span class="col-cat col-sortable" data-sort="category" onclick="toggleLedgerSort('category')">KATEGORI <span class="sort-arrow"></span></span>
-                                <span class="col-desc col-sortable" data-sort="description" onclick="toggleLedgerSort('description')">KETERANGAN <span class="sort-arrow"></span></span>
-                                <span class="col-amount col-sortable" data-sort="amount" onclick="toggleLedgerSort('amount')">NOMINAL <span class="sort-arrow"></span></span>
+                                <span class="col-date col-sortable sort-desc" data-sort="date"
+                                    onclick="toggleLedgerSort('date')">TANGGAL <span class="sort-arrow"></span></span>
+                                <span class="col-cat col-sortable" data-sort="category"
+                                    onclick="toggleLedgerSort('category')">KATEGORI <span
+                                        class="sort-arrow"></span></span>
+                                <span class="col-desc col-sortable" data-sort="description"
+                                    onclick="toggleLedgerSort('description')">KETERANGAN <span
+                                        class="sort-arrow"></span></span>
+                                <span class="col-amount col-sortable" data-sort="amount"
+                                    onclick="toggleLedgerSort('amount')">NOMINAL <span class="sort-arrow"></span></span>
                                 <span class="col-source">SUMBER</span>
                                 <span class="col-action">AKSI</span>
                             </div>
@@ -810,11 +907,14 @@
                             <div class="ledger-v2-cards" id="ledgerCardsContainer">
                                 <!-- Cards rendered by JS -->
                             </div>
-                            
+
                             <!-- Empty State -->
                             <div class="ledger-v2-empty hidden" id="ledgerEmpty">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 64px; height: 64px; color: var(--text-muted); opacity: 0.5;">
-                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                    stroke-linecap="round" stroke-linejoin="round"
+                                    style="width: 64px; height: 64px; color: var(--text-muted); opacity: 0.5;">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                                    <polyline points="14 2 14 8 20 8" />
                                 </svg>
                                 <p>Belum ada catatan yang ditemukan.</p>
                             </div>
@@ -836,8 +936,9 @@
         <main class="goals page-view" id="pageGoals" style="display:none;">
             <div class="container">
                 <div class="goals-wrapper" style="padding-top: 100px; text-align:center;">
-                    <h2 style="font-size: 2rem; color: #1a1a2e;">🏗️ Tujuan Kerajaan</h2>
-                    <p style="color: var(--text-secondary); margin-top: 20px;">Halaman ini akan dirombak dan dibangun pada fase berikutnya.</p>
+                    <h2 style="font-size: 2rem; color: #1a1a2e;">Tujuan Kerajaan</h2>
+                    <p style="color: var(--text-secondary); margin-top: 20px;">Halaman ini akan dirombak dan dibangun
+                        pada fase berikutnya.</p>
                 </div>
             </div>
         </main>
@@ -872,10 +973,12 @@
             <div class="item-list" id="goalsList"></div>
             <div class="modal-add-row" style="flex-direction: column; gap: 8px;">
                 <div style="display: flex; gap: 8px; width: 100%;">
-                    <input type="text" class="form-input" id="newGoalName" placeholder="Nama tabungan baru" style="flex: 1">
+                    <input type="text" class="form-input" id="newGoalName" placeholder="Nama tabungan baru"
+                        style="flex: 1">
                     <div class="form-input-with-prefix" style="flex: 1;">
                         <span class="form-prefix">Rp</span>
-                        <input type="number" class="form-input" id="newGoalTarget" placeholder="Target (opsional)" min="0">
+                        <input type="number" class="form-input" id="newGoalTarget" placeholder="Target (opsional)"
+                            min="0">
                     </div>
                 </div>
                 <button class="btn btn-sm btn-amber" onclick="addGoal()" style="width: 100%;">Tambah Tujuan</button>
@@ -968,15 +1071,73 @@
                 <span class="modal-title">Foto Bukti Transaksi</span>
                 <button class="modal-close" onclick="closeModal('photoViewerModal')">x</button>
             </div>
-            <div style="margin-top: 15px; border-radius: 12px; overflow: hidden; border: 4px solid var(--border-dark); box-shadow: 4px 4px 0 var(--border-dark); background: var(--bg-card); display: inline-block;">
-                <img id="viewerPhotoImg" src="" alt="Foto Bukti" style="max-width: 100%; max-height: 70vh; display: block; object-fit: contain;">
+            <div
+                style="margin-top: 15px; border-radius: 12px; overflow: hidden; border: 4px solid var(--border-dark); box-shadow: 4px 4px 0 var(--border-dark); background: var(--bg-card); display: inline-block;">
+                <img id="viewerPhotoImg" src="" alt="Foto Bukti"
+                    style="max-width: 100%; max-height: 70vh; display: block; object-fit: contain;">
             </div>
             <div style="margin-top: 15px; display: flex; gap: 10px; justify-content: center;">
-                 <button class="btn btn-blue" id="btnDownloadViewer" style="flex: 1;">
-                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                     Unduh Foto
-                 </button>
+                <button class="btn btn-blue" id="btnDownloadViewer" style="flex: 1;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                        <polyline points="7 10 12 15 17 10" />
+                        <line x1="12" y1="15" x2="12" y2="3" />
+                    </svg>
+                    Unduh Foto
+                </button>
             </div>
+        </div>
+    </div>
+
+    <!-- ========== MODAL: AI Settings ========== -->
+    <div class="modal-overlay" id="aiSettingsModal">
+        <div class="modal-backdrop" onclick="closeModal('aiSettingsModal')"></div>
+        <div class="modal-content" style="max-width: 500px; padding: 24px;">
+            <div class="modal-header">
+                <span class="modal-title">
+                    <svg viewBox="0 0 24 24" fill="none" class="icon" stroke="currentColor" stroke-width="2.5"
+                        stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px; vertical-align:middle;">
+                        <rect x="3" y="11" width="18" height="10" rx="2" />
+                        <circle cx="12" cy="5" r="2" />
+                        <path d="M12 7v4" />
+                        <line x1="8" y1="16" x2="8" y2="16" />
+                        <line x1="16" y1="16" x2="16" y2="16" />
+                    </svg>
+                    Konfigurasi AI Mascot
+                </span>
+                <button class="modal-close" onclick="closeModal('aiSettingsModal')">x</button>
+            </div>
+
+            <div class="toast warning"
+                style="position:relative; transform:none; opacity:1; margin-bottom: 20px; transition:none; z-index:1;">
+                Untuk mengaktifkan kepintaran AI, masukkan API Key murni. Key hanya akan disimpan di Session Storage
+                lokal dan hilang saat tab ditutup.
+            </div>
+
+            <div class="form-group" style="margin-bottom: 16px;">
+                <label class="form-label" for="geminiApiKey">Gemini API Key (Primary)</label>
+                <input type="password" class="form-input" id="geminiApiKey" placeholder="sk-...">
+                <div style="font-size: 0.8rem; margin-top: 4px; color: var(--text-muted);">Dapatkan gratis di Google AI
+                    Studio</div>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 24px;">
+                <label class="form-label" for="groqApiKey">Groq API Key (Fallback Llama 3)</label>
+                <input type="password" class="form-input" id="groqApiKey" placeholder="gsk_...">
+                <div style="font-size: 0.8rem; margin-top: 4px; color: var(--text-muted);">Dapatkan gratis di Groq
+                    Console</div>
+            </div>
+
+            <button class="btn btn-green mt-sm" onclick="saveAiSettings()" style="width: 100%; height: 48px;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+                    stroke-linejoin="round">
+                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                    <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                    <polyline points="7 3 7 8 15 8"></polyline>
+                </svg>
+                Simpan & Aktifkan AI
+            </button>
         </div>
     </div>
 
@@ -985,16 +1146,22 @@
         <div class="modal-backdrop" onclick="closeModal('confirmModal')"></div>
         <div class="modal-content" style="max-width: 400px; padding: 24px; text-align: center;">
             <div style="margin-bottom: 16px;">
-                <svg viewBox="0 0 24 24" fill="none" class="icon" stroke="#f44336" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width: 48px; height: 48px;">
+                <svg viewBox="0 0 24 24" fill="none" class="icon" stroke="#f44336" stroke-width="2.5"
+                    stroke-linecap="round" stroke-linejoin="round" style="width: 48px; height: 48px;">
                     <circle cx="12" cy="12" r="10" />
                     <line x1="12" y1="8" x2="12" y2="12" />
                     <line x1="12" y1="16" x2="12.01" y2="16" />
                 </svg>
             </div>
-            <h3 style="font-size: 1.3rem; margin-bottom: 12px; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 900;">Konfirmasi Tindakan</h3>
-            <p id="confirmModalText" style="font-size: 1rem; color: var(--text-secondary); margin-bottom: 24px; font-weight: 600;">Apakah Anda yakin?</p>
+            <h3
+                style="font-size: 1.3rem; margin-bottom: 12px; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 900;">
+                Konfirmasi Tindakan</h3>
+            <p id="confirmModalText"
+                style="font-size: 1rem; color: var(--text-secondary); margin-bottom: 24px; font-weight: 600;">Apakah
+                Anda yakin?</p>
             <div style="display: flex; gap: 12px; justify-content: center;">
-                <button class="btn btn-sm btn-red" id="btnConfirmCancel" onclick="closeModal('confirmModal')" style="flex: 1; background: #fecaca; color: #1a1a2e;">Batal</button>
+                <button class="btn btn-sm btn-red" id="btnConfirmCancel" onclick="closeModal('confirmModal')"
+                    style="flex: 1; background: #fecaca; color: #1a1a2e;">Batal</button>
                 <button class="btn btn-sm btn-red" id="btnConfirmAction" style="flex: 1;">Ya, Lanjutkan</button>
             </div>
         </div>
@@ -1003,7 +1170,11 @@
     <!-- ========== FULLSCREEN CAMERA VIEWFINDER ========== -->
     <div class="camera-viewfinder-wrap hidden" id="cameraViewfinderWrap">
         <button type="button" class="camera-close-btn" onclick="toggleCamera()" aria-label="Tutup Kamera">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+                stroke-linejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
         </button>
 
         <!-- Live Viewfinder inside Polaroid Card -->
@@ -1017,26 +1188,38 @@
                 </button>
             </div>
         </div>
-        
+
         <!-- Polaroid Preview (hidden until capture) -->
         <div class="fs-polaroid-wrap hidden" id="fsPolaroidWrap">
             <div class="fs-polaroid-card">
                 <img id="fsPolaroidImg" alt="Foto bukti">
             </div>
         </div>
-        
+
         <!-- Preview action buttons -->
         <div id="cameraActionPreview" class="fs-action-bar hidden">
             <button type="button" class="fs-btn fs-btn-download" onclick="downloadPhoto()">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+                    stroke-linejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
                 Unduh
             </button>
             <button type="button" class="fs-btn fs-btn-retake" onclick="retakeFullscreenPhoto()">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+                    stroke-linejoin="round">
+                    <polyline points="1 4 1 10 7 10" />
+                    <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+                </svg>
                 Ulangi
             </button>
             <button type="button" class="fs-btn fs-btn-done" onclick="acceptPhoto()">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+                    stroke-linejoin="round">
+                    <polyline points="20 6 9 17 4 12" />
+                </svg>
                 Done
             </button>
         </div>
